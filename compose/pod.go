@@ -86,10 +86,11 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		NetworkAliases: map[string][]string{
 			p.network: {pod.Name},
 		},
-		Image:    PauseImage,
-		Networks: []string{p.network, docker.Bridge},
-		DNS:      pod.Dns,
-		CapAdd:   []string{"NET_ADMIN", "NET_RAW"},
+		Image:      PauseImage,
+		Networks:   []string{p.dockerProvider.GetDefaultNetwork(), p.network},
+		DNS:        pod.Dns,
+		CapAdd:     []string{"NET_ADMIN", "NET_RAW"},
+		AutoRemove: true,
 	}, p.sessionID)
 	if err != nil {
 		return err
@@ -175,5 +176,6 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		User:            c.User,
 		Env:             c.Env,
 		WaitingFor:      p.createWaitingFor(isInit, c),
+		AutoRemove:      true,
 	}, p.sessionID)
 }

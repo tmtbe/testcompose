@@ -11,7 +11,7 @@ func Test_Compose(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	compose, err := NewCompose(file)
+	compose, err := NewCompose(file, "", "")
 	if err != nil {
 		panic(err)
 	}

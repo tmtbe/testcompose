@@ -32,7 +32,7 @@ func (v *Volume) createVolumes(ctx context.Context, sessionId string) error {
 }
 
 func (v *Volume) clean(ctx context.Context) {
-	for _, _ = range v.createVolumesResult {
-		// todo clean volume
+	for _, cvr := range v.createVolumesResult {
+		_ = v.dockerProvider.RemoveVolume(ctx, cvr.Name, true)
 	}
 }

@@ -8,23 +8,24 @@ import (
 )
 
 type Compose struct {
-	podCompose *PodCompose
-	config     *ComposeConfig
-	provider   *docker.DockerProvider
-	volume     *Volume
+	podCompose     *PodCompose
+	config         *ComposeConfig
+	dockerProvider *docker.DockerProvider
+	volume         *Volume
 }
 
-func NewCompose(configBytes []byte) (*Compose, error) {
+func NewCompose(configBytes []byte, sessionId string, contextPath string) (*Compose, error) {
 	sessionID, _ := uuid.NewUUID()
 	var config ComposeConfig
 	err := yaml.Unmarshal(configBytes, &config)
 	if err != nil {
 		return nil, err
 	}
+	config.SessionId = sessionId
 	if config.SessionId == "" {
 		config.SessionId = sessionID.String()
 	}
-	err = config.check()
+	err = config.check(contextPath)
 	if err != nil {
 		return nil, err
 	}
@@ -32,24 +33,32 @@ func NewCompose(configBytes []byte) (*Compose, error) {
 	if err != nil {
 		return nil, err
 	}
-	compose, err := NewPodCompose(sessionID.String(), config.Pods, config.getNetworkName(), provider)
+	compose, err := NewPodCompose(sessionID.String(), config.Pods, config.GetNetworkName(), provider)
 	if err != nil {
 		return nil, err
 	}
 	return &Compose{
-		podCompose: compose,
-		config:     &config,
-		provider:   provider,
-		volume:     NewVolumes(config.Volumes, provider),
+		podCompose:     compose,
+		config:         &config,
+		dockerProvider: provider,
+		volume:         NewVolumes(config.Volumes, provider),
 	}, nil
+}
+
+func (c *Compose) GetConfig() *ComposeConfig {
+	return c.config
+}
+
+func (c *Compose) GetDockerProvider() *docker.DockerProvider {
+	return c.dockerProvider
 }
 
 // PrepareNetworkAndVolumes network and volumes should be init before agent start
 func (c *Compose) PrepareNetworkAndVolumes(ctx context.Context) error {
-	_, err := c.provider.CreateNetwork(ctx, docker.NetworkRequest{
+	_, err := c.dockerProvider.CreateNetwork(ctx, docker.NetworkRequest{
 		Driver:         docker.Bridge,
 		CheckDuplicate: true,
-		Name:           c.config.getNetworkName(),
+		Name:           c.config.GetNetworkName(),
 	}, c.config.SessionId)
 	if err != nil {
 		return err

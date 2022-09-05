@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	Bridge            = "bridge"      // Bridge network name (as well as driver)
-	DefaultNetwork    = "default_pod" // Default network name when bridge is not available
+	Bridge            = "bridge"        // Bridge network name (as well as driver)
+	DefaultNetwork    = "default_agent" // Default network name when bridge is not available
 	Host              = "DOCKER_HOST"
 	PodContainerLabel = "PodContainer"
 	ComposeSessionID  = "ComposeSessionID"
@@ -60,11 +60,30 @@ func NewDockerProvider() (*DockerProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.NegotiateAPIVersion(context.Background())
+	ctx := context.Background()
+	c.NegotiateAPIVersion(ctx)
 	p := &DockerProvider{
 		client: c,
 	}
+	err = p.setDefaultNetwork(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return p, nil
+}
+
+func (p *DockerProvider) GetDefaultNetwork() string {
+	return p.defaultNetwork
+}
+func (p *DockerProvider) setDefaultNetwork(ctx context.Context) error {
+	// Make sure that bridge network exists
+	// In case it is disabled we will create agent_default network
+	var err error
+	p.defaultNetwork, err = getDefaultNetwork(ctx, p.client)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // CreateContainer fulfills a request for a container without starting it
@@ -75,28 +94,6 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 	}
 	req.Labels[PodContainerLabel] = "true"
 	req.Labels[ComposeSessionID] = sessionId
-	// Make sure that bridge network exists
-	// In case it is disabled we will create reaper_default network
-	p.defaultNetwork, err = getDefaultNetwork(ctx, p.client)
-	if err != nil {
-		return nil, err
-	}
-
-	// If default network is not bridge make sure it is attached to the request
-	// as container won't be attached to it automatically
-	if p.defaultNetwork != Bridge {
-		isAttached := false
-		for _, net := range req.Networks {
-			if net == p.defaultNetwork {
-				isAttached = true
-				break
-			}
-		}
-
-		if !isAttached {
-			req.Networks = append(req.Networks, p.defaultNetwork)
-		}
-	}
 
 	exposedPortSet, exposedPortMap, err := nat.ParsePortSpecs(req.ExposedPorts)
 	if err != nil {
@@ -349,11 +346,6 @@ func (p *DockerProvider) daemonHost(ctx context.Context) (string, error) {
 // CreateNetwork returns the object representing a new network identified by its name
 func (p *DockerProvider) CreateNetwork(ctx context.Context, req NetworkRequest, sessionId string) (Network, error) {
 	var err error
-
-	// Make sure that bridge network exists
-	// In case it is disabled we will create reaper_default network
-	p.defaultNetwork, err = getDefaultNetwork(ctx, p.client)
-
 	if req.Labels == nil {
 		req.Labels = make(map[string]string)
 	}
@@ -435,6 +427,11 @@ func (p *DockerProvider) CreateVolume(ctx context.Context, name string, sessionI
 		},
 	})
 }
+
+func (p *DockerProvider) RemoveVolume(ctx context.Context, volumeID string, force bool) error {
+	return p.client.VolumeRemove(ctx, volumeID, force)
+}
+
 func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) {
 	// Get list of available networks
 	networkResources, err := cli.NetworkList(ctx, types.NetworkListOptions{})
@@ -442,23 +439,32 @@ func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) 
 		return "", err
 	}
 
-	reaperNetwork := DefaultNetwork
+	agentNetwork := DefaultNetwork
 
-	reaperNetworkExists := false
+	agentNetworkExists := false
+
+	// clean empty network
+	for _, net := range networkResources {
+		if len(net.Containers) == 0 {
+			if net.Labels[PodContainerLabel] == "true" {
+				_ = cli.NetworkRemove(ctx, net.ID)
+			}
+		}
+	}
 
 	for _, net := range networkResources {
 		if net.Name == Bridge {
 			return Bridge, nil
 		}
 
-		if net.Name == reaperNetwork {
-			reaperNetworkExists = true
+		if net.Name == agentNetwork {
+			agentNetworkExists = true
 		}
 	}
 
 	// Create a bridge network for the container communications
-	if !reaperNetworkExists {
-		_, err = cli.NetworkCreate(ctx, reaperNetwork, types.NetworkCreate{
+	if !agentNetworkExists {
+		_, err = cli.NetworkCreate(ctx, agentNetwork, types.NetworkCreate{
 			Driver:     Bridge,
 			Attachable: true,
 		})
@@ -468,7 +474,7 @@ func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) 
 		}
 	}
 
-	return reaperNetwork, nil
+	return agentNetwork, nil
 }
 
 func inAContainer() bool {
@@ -649,7 +655,7 @@ func (c *DockerContainer) Stop(ctx context.Context, timeout *time.Duration) erro
 // Terminate is used to kill the container. It is usually triggered by as defer function.
 func (c *DockerContainer) Terminate(ctx context.Context) error {
 	select {
-	// close reaper if it was created
+	// close agent if it was created
 	case c.terminationSignal <- true:
 	default:
 	}
@@ -975,7 +981,7 @@ type DockerNetwork struct {
 // Remove is used to remove the network. It is usually triggered by as defer function.
 func (n *DockerNetwork) Remove(ctx context.Context) error {
 	select {
-	// close reaper if it was created
+	// close agent if it was created
 	case n.terminationSignal <- true:
 	default:
 	}

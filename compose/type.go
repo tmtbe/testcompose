@@ -3,6 +3,8 @@ package compose
 import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"os"
+	"path/filepath"
 )
 
 type ComposeConfig struct {
@@ -13,11 +15,11 @@ type ComposeConfig struct {
 	Volumes   []*VolumeConfig `json:"volumes" yaml:"volumes"`
 }
 
-func (c *ComposeConfig) getNetworkName() string {
+func (c *ComposeConfig) GetNetworkName() string {
 	return c.Network + "_" + c.SessionId
 }
 
-func (c *ComposeConfig) check() error {
+func (c *ComposeConfig) check(contextPath string) error {
 	if c.Version != "1" {
 		return errors.New("version must be 1")
 	}
@@ -47,7 +49,7 @@ func (c *ComposeConfig) check() error {
 			return errors.Errorf("duplicate volume name:%s", v.Name)
 		}
 		volumeMap[v.Name] = v.Name
-		if err := v.check(); err != nil {
+		if err := v.check(contextPath); err != nil {
 			return err
 		}
 	}
@@ -57,15 +59,22 @@ func (c *ComposeConfig) check() error {
 type VolumeConfig struct {
 	Name     string            `json:"name" yaml:"name"`
 	EmptyDir map[string]string `json:"emptyDir" yaml:"emptyDir"`
-	HostPath string            `json:"hostPath" yaml:"hostDPath"`
+	HostPath string            `json:"hostPath" yaml:"hostPath"`
 }
 
-func (v *VolumeConfig) check() error {
+func (v *VolumeConfig) check(contextPath string) error {
 	if v.Name == "" {
 		return errors.New("volume name must be set")
 	}
 	if v.EmptyDir == nil && v.HostPath == "" {
 		return errors.New("volume emptyDir hostPath cannot be null at the same time")
+	}
+	if v.HostPath != "" {
+		fileName := filepath.Join(contextPath, v.HostPath)
+		_, err := os.Stat(fileName)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
