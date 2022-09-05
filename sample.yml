@@ -1,0 +1,42 @@
+version: 1
+network: test
+volumes:
+  - name: { name }
+    emptyDir: {}
+    hostPath: { host_path }
+pods:
+  - name: { pod_name }
+    depends:
+      - { depend }
+    dns:
+      - { dns }
+    initContainers:
+      - name: { container_name }
+        image: { init_image }
+    containers:
+      - name: { container_name }
+        ports:
+          - { port }
+        waitingFor:
+          httpGet:
+            path: /healthz
+            port: 8080
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        privileged: { bool }
+        alwaysPullImage: { bool }
+        user: { user }
+        volumeMounts:
+          - name: workdir
+            mountPath: "/work-dir"
+        env:
+          "xxx":"xxx"
+        command:
+          - { command }
+        cap:
+          add:
+            - { CAP }
+          drop:
+            - { CAP }

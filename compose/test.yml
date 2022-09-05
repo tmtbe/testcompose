@@ -1,0 +1,13 @@
+version: 1
+network: test
+volumes:
+  - name: workdir
+    emptyDir: {}
+pods:
+  - name: pod1
+    containers:
+      - name: nginx
+        image: nginx
+        volumeMounts:
+          - name: workdir
+            mountPath: "/work-dir"
