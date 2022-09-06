@@ -3,12 +3,9 @@ package main
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"podcompose/common"
 	"podcompose/compose"
@@ -17,9 +14,10 @@ import (
 
 type Starter struct {
 	*compose.Compose
+	hostContextPath string
 }
 
-func NewStarter(workspace string, sessionId string) (*Starter, error) {
+func NewStarter(workspace string, sessionId string, hostContextPath string) (*Starter, error) {
 	workspace, err := filepath.Abs(workspace)
 	if err != nil {
 		return nil, err
@@ -32,21 +30,31 @@ func NewStarter(workspace string, sessionId string) (*Starter, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.SetHostContextPath(hostContextPath)
 	return &Starter{
-		Compose: c,
+		Compose:         c,
+		hostContextPath: hostContextPath,
 	}, nil
 }
 
-func (r *Starter) start() error {
-	err := r.copyDataToVolumes()
+func (s *Starter) start() error {
+	ctx := context.Background()
+	selectData := make(map[string]string)
+	for _, v := range s.Compose.GetConfig().Volumes {
+		selectData[v.Name] = "normal"
+	}
+	err := s.Compose.CreateVolumes(ctx)
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
-	return r.Compose.StartPods(ctx)
+	err = s.Compose.StartAgentForSetVolume(ctx, selectData)
+	if err != nil {
+		return err
+	}
+	return s.Compose.StartPods(ctx)
 }
 
-func (r *Starter) startWebServer() error {
+func (s *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
 	router := gin.Default()
 	router.GET(common.AgentHealthEndPoint, func(c *gin.Context) {
@@ -56,10 +64,26 @@ func (r *Starter) startWebServer() error {
 	})
 	router.GET(common.AgentShutdownEndPoint, func(c *gin.Context) {
 		ctx := context.Background()
-		_ = r.Clean(ctx)
+		_ = s.StartAgentForClean(ctx)
 		quit <- true
 		c.JSON(http.StatusOK, gin.H{
 			"message": "shutdown",
+		})
+	})
+	router.POST(common.AgentSwitchDataEndPoint, func(c *gin.Context) {
+		ctx := context.Background()
+		type RestartBody map[string]string
+		var restartBody RestartBody
+		err := c.BindJSON(&restartBody)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+		_ = s.StartAgentForSwitchData(ctx, restartBody)
+		c.JSON(http.StatusOK, gin.H{
+			"message": "switchData ok",
 		})
 	})
 	srv := &http.Server{
@@ -86,22 +110,18 @@ func (r *Starter) startWebServer() error {
 	return nil
 }
 
-func (r *Starter) copyDataToVolumes() error {
-	for _, v := range r.Compose.GetConfig().Volumes {
-		if v.HostPath != "" {
-			sourcePath := filepath.Join(common.AgentContextPath, v.HostPath)
-			targetPath := filepath.Join(common.AgentVolumePath, v.Name)
-			rd, err := ioutil.ReadDir(sourcePath)
-			if err != nil {
-				return err
-			}
-			for _, fi := range rd {
-				stdout, err := exec.Command("cp", "-r", filepath.Join(sourcePath, fi.Name()), targetPath).CombinedOutput()
-				if err != nil {
-					return errors.Wrap(err, string(stdout))
-				}
-			}
-		}
+func (s *Starter) switchData(selectData map[string]string) error {
+	ctx := context.Background()
+	volumeNames := make([]string, 0)
+	for volumeName, _ := range selectData {
+		volumeNames = append(volumeNames, volumeName)
 	}
-	return nil
+	pods := s.Compose.FindPodsWhoUsedVolumes(volumeNames)
+	return s.Compose.RestartPods(ctx, pods, func() error {
+		err := s.Compose.ReCreateVolumes(ctx, volumeNames)
+		if err != nil {
+			return err
+		}
+		return s.Compose.StartAgentForSetVolume(ctx, selectData)
+	})
 }

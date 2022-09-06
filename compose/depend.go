@@ -7,14 +7,14 @@ type DependFloor struct {
 }
 type DependFloors []*DependFloor
 
-func (ds DependFloors) GetStartOrder() [][]*PodConfig {
-	order := make([][]*PodConfig, 0)
+func (ds DependFloors) GetStartOrder() []map[string]*PodConfig {
+	order := make([]map[string]*PodConfig, 0)
 	filter := make(map[string]string, 0)
 	for i := len(ds) - 1; i >= 0; i-- {
-		orderFloor := make([]*PodConfig, 0)
+		orderFloor := make(map[string]*PodConfig)
 		for k, v := range ds[i].FixWho {
 			if _, ok := filter[k]; !ok {
-				orderFloor = append(orderFloor, v)
+				orderFloor[v.Name] = v
 			}
 			filter[k] = k
 		}

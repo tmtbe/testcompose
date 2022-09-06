@@ -53,23 +53,29 @@ func (c *ComposeConfig) check(contextPath string) error {
 }
 
 type VolumeConfig struct {
-	Name     string            `json:"name" yaml:"name"`
-	EmptyDir map[string]string `json:"emptyDir" yaml:"emptyDir"`
-	HostPath string            `json:"hostPath" yaml:"hostPath"`
+	Name       string            `json:"name" yaml:"name"`
+	EmptyDir   map[string]string `json:"emptyDir" yaml:"emptyDir"`
+	SwitchData map[string]string `json:"switchData" yaml:"switchData"`
 }
 
 func (v *VolumeConfig) check(contextPath string) error {
 	if v.Name == "" {
 		return errors.New("volume name must be set")
 	}
-	if v.EmptyDir == nil && v.HostPath == "" {
+	if v.EmptyDir == nil && v.SwitchData == nil {
 		return errors.New("volume emptyDir hostPath cannot be null at the same time")
 	}
-	if v.HostPath != "" {
-		fileName := filepath.Join(contextPath, v.HostPath)
-		_, err := os.Stat(fileName)
-		if err != nil {
-			return err
+	if v.SwitchData != nil {
+		_, ok := v.SwitchData["normal"]
+		if !ok {
+			return errors.Errorf("volume:[%s] not found \"normal\" host path", v.Name)
+		}
+		for _, path := range v.SwitchData {
+			fileName := filepath.Join(contextPath, path)
+			_, err := os.Stat(fileName)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

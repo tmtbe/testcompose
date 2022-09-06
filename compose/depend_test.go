@@ -40,8 +40,8 @@ func Test_Depend(t *testing.T) {
 		convey.So(err, convey.ShouldBeNil)
 		convey.So(floors, convey.ShouldNotBeNil)
 		order := floors.GetStartOrder()
-		convey.So(order[4][0].Name, convey.ShouldEqual, "A")
-		convey.So(order[3][0].Name, convey.ShouldEqual, "B")
+		convey.So(order[4]["A"].Name, convey.ShouldEqual, "A")
+		convey.So(order[3]["B"].Name, convey.ShouldEqual, "B")
 	})
 
 }

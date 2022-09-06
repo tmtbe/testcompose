@@ -18,7 +18,7 @@ func Test_Compose(t *testing.T) {
 		panic(err)
 	}
 	ctx := context.Background()
-	err = compose.PrepareNetworkAndVolumes(ctx)
+	err = compose.PrepareNetwork(ctx)
 	if err != nil {
 		panic(err)
 	}

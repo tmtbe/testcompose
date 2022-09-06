@@ -4,66 +4,83 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"podcompose/common"
+	"strings"
 )
 
-var rootCmd = &cobra.Command{
-	Use: "agent",
-}
-var cleanCmd = &cobra.Command{
-	Use: "clean",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := clean()
-		if err != nil {
-			panic(err)
-		}
-	},
-}
-
-var startCmd = &cobra.Command{
-	Use: "start",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := start()
-		if err != nil {
-			panic(err)
-		}
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(cleanCmd)
-}
-
-func clean() error {
+func main() {
 	sessionId := os.Getenv(common.AgentSessionID)
+	hostContextPath := os.Getenv(common.HostContextPath)
+	runner, err := NewStarter(common.AgentContextPath, sessionId, hostContextPath)
+	volume, err := NewVolume(common.AgentContextPath, sessionId)
 	cleaner, err := NewCleaner(sessionId)
 	if err != nil {
-		return err
+		panic(err)
 	}
-	cleaner.clear()
-	return nil
-}
-
-func start() error {
-	sessionId := os.Getenv(common.AgentSessionID)
-	runner, err := NewStarter(common.AgentContextPath, sessionId)
-	if err != nil {
-		return err
+	rootCmd := &cobra.Command{
+		Use: "agent",
 	}
-	go func() {
-		if err = runner.start(); err != nil {
-			panic(err)
-		}
-	}()
-	if err = runner.startWebServer(); err != nil {
-		return err
+	cleanCmd := &cobra.Command{
+		Use: "clean",
+		Run: func(cmd *cobra.Command, args []string) {
+			cleaner.clear()
+		},
 	}
-	return nil
-}
-
-// Execute executes the root command.
-func main() {
-	err := rootCmd.Execute()
+	prepareVolumeDataCmd := &cobra.Command{
+		Use: "prepareVolumeData",
+		Run: func(cmd *cobra.Command, args []string) {
+			selectArr, err := cmd.Flags().GetStringArray("select")
+			if err != nil {
+				panic(err)
+			}
+			selectMap := make(map[string]string)
+			for _, selectGroup := range selectArr {
+				selectGroupSplit := strings.Split(selectGroup, "=")
+				selectMap[selectGroupSplit[0]] = selectGroupSplit[1]
+			}
+			err = volume.copyDataToVolumes(selectMap)
+			if err != nil {
+				panic(err)
+			}
+		},
+	}
+	prepareVolumeDataCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
+	startCmd := &cobra.Command{
+		Use: "start",
+		Run: func(cmd *cobra.Command, args []string) {
+			go func() {
+				if err = runner.start(); err != nil {
+					panic(err)
+				}
+			}()
+			if err = runner.startWebServer(); err != nil {
+				panic(err)
+			}
+		},
+	}
+	reStartCmd := &cobra.Command{
+		Use: "switch",
+		Run: func(cmd *cobra.Command, args []string) {
+			selectArr, err := cmd.Flags().GetStringArray("select")
+			if err != nil {
+				panic(err)
+			}
+			selectMap := make(map[string]string)
+			for _, selectGroup := range selectArr {
+				selectGroupSplit := strings.Split(selectGroup, "=")
+				selectMap[selectGroupSplit[0]] = selectGroupSplit[1]
+			}
+			err = runner.switchData(selectMap)
+			if err != nil {
+				panic(err)
+			}
+		},
+	}
+	reStartCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(reStartCmd)
+	rootCmd.AddCommand(cleanCmd)
+	rootCmd.AddCommand(prepareVolumeDataCmd)
+	err = rootCmd.Execute()
 	if err != nil {
 		panic(err)
 	}

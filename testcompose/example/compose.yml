@@ -1,7 +1,9 @@
 version: 1
 volumes:
   - name: workdir
-    hostPath: ./data1
+    switchData:
+      normal: "./switch_data_1"
+      data2: "./switch_data_2"
 pods:
   - name: pod1
     containers:

@@ -3,7 +3,8 @@ network: test
 volumes:
   - name: { name }
     emptyDir: {}
-    hostPath: { host_path }
+    switchData:
+      normal: xxx
 pods:
   - name: { pod_name }
     depends:

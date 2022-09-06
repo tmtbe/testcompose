@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/go-connections/nat"
@@ -15,17 +16,22 @@ import (
 const (
 	PauseImage      = "gcr.io/google_containers/pause:3.0"
 	InitExitTimeOut = 60000
+	PodName         = "PDO_NAME"
 )
 
 type PodCompose struct {
 	sessionId      string
-	orderPods      [][]*PodConfig
+	orderPods      []map[string]*PodConfig
 	network        string
 	dockerProvider *docker.DockerProvider
-	podContainers  map[string][]docker.Container
+	pods           map[string]*PodConfig
 }
 
 func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerProvider *docker.DockerProvider) (*PodCompose, error) {
+	podMap := make(map[string]*PodConfig)
+	for _, pod := range pods {
+		podMap[pod.Name] = pod
+	}
 	if floors, err := BuildDependFloors(pods); err != nil {
 		return nil, err
 	} else {
@@ -33,19 +39,12 @@ func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerPr
 			orderPods:      floors.GetStartOrder(),
 			network:        network,
 			dockerProvider: dockerProvider,
-			podContainers:  make(map[string][]docker.Container, 0),
 			sessionId:      sessionID,
+			pods:           podMap,
 		}, nil
 	}
 }
 
-func (p *PodCompose) clean(ctx context.Context) {
-	for _, containers := range p.podContainers {
-		for _, c := range containers {
-			_ = c.Terminate(ctx)
-		}
-	}
-}
 func (p *PodCompose) start(ctx context.Context) error {
 	for _, pods := range p.orderPods {
 		return p.concurrencyCreatePods(ctx, pods)
@@ -53,7 +52,7 @@ func (p *PodCompose) start(ctx context.Context) error {
 	return nil
 }
 
-func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods []*PodConfig) error {
+func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]*PodConfig) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errorChannel := make(chan error, len(pods))
@@ -86,10 +85,13 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		NetworkAliases: map[string][]string{
 			p.network: {pod.Name},
 		},
-		Image:      PauseImage,
-		Networks:   []string{p.dockerProvider.GetDefaultNetwork(), p.network},
-		DNS:        pod.Dns,
-		CapAdd:     []string{"NET_ADMIN", "NET_RAW"},
+		Image:    PauseImage,
+		Networks: []string{p.dockerProvider.GetDefaultNetwork(), p.network},
+		DNS:      pod.Dns,
+		CapAdd:   []string{"NET_ADMIN", "NET_RAW"},
+		Labels: map[string]string{
+			PodName: pod.Name,
+		},
 		AutoRemove: true,
 	}, p.sessionId)
 	if err != nil {
@@ -113,7 +115,6 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		}
 		containers = append(containers, createContainer)
 	}
-	p.podContainers[pod.Name] = containers
 	return nil
 }
 
@@ -176,5 +177,114 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		User:            c.User,
 		Env:             c.Env,
 		WaitingFor:      p.createWaitingFor(isInit, c),
+		Labels: map[string]string{
+			PodName: podName,
+		},
 	}, p.sessionId)
+}
+
+func (p *PodCompose) foundContainerWithPods(ctx context.Context, pods map[string]*PodConfig) ([]types.Container, error) {
+	containers, err := p.dockerProvider.FindContainers(ctx, p.sessionId)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]types.Container, 0)
+	for _, c := range containers {
+		if _, ok := pods[c.Labels[PodName]]; ok {
+			result = append(result, c)
+		}
+	}
+	return result, nil
+}
+
+func (p *PodCompose) RestartPods(ctx context.Context, pods []string, beforeStart func() error) error {
+	needRestartPods := p.findWhoDependPods(pods, make(map[string]*PodConfig))
+	containers, err := p.foundContainerWithPods(ctx, needRestartPods)
+	if err != nil {
+		return err
+	}
+	for _, c := range containers {
+		err := p.dockerProvider.RemoveContainer(ctx, c.ID)
+		if err != nil {
+			return err
+		}
+	}
+	err = beforeStart()
+	if err != nil {
+		return err
+	}
+	for _, orderPod := range p.orderPods {
+		needConcurrencyCreatePods := make(map[string]*PodConfig)
+		for _, restartPod := range needRestartPods {
+			if _, ok := orderPod[restartPod.Name]; ok {
+				needConcurrencyCreatePods[restartPod.Name] = restartPod
+			}
+		}
+		if len(needConcurrencyCreatePods) > 0 {
+			err := p.concurrencyCreatePods(ctx, needConcurrencyCreatePods)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (p *PodCompose) findWhoDependPods(podNames []string, depends map[string]*PodConfig) map[string]*PodConfig {
+	size := len(depends)
+	for _, podName := range podNames {
+		depends[podName] = p.pods[podName]
+		for _, pod := range p.pods {
+			for _, dependName := range pod.Depends {
+				if dependName == podName {
+					depends[pod.Name] = p.pods[pod.Name]
+					break
+				}
+			}
+		}
+	}
+	if len(depends) == size {
+		return depends
+	}
+	dependPodNames := make([]string, 0)
+	for _, dependPod := range depends {
+		dependPodNames = append(dependPodNames, dependPod.Name)
+	}
+	return p.findWhoDependPods(dependPodNames, depends)
+}
+
+func (p *PodCompose) findPodsWhoUsedVolumes(volumeNames []string) []*PodConfig {
+	pods := make([]*PodConfig, 0)
+	nameMap := make(map[string]string)
+	for _, vn := range volumeNames {
+		nameMap[vn] = vn
+	}
+	for _, pod := range p.pods {
+		isBreak := false
+		for _, c := range pod.Containers {
+			if isBreak {
+				break
+			}
+			for _, vm := range c.VolumeMounts {
+				if _, ok := nameMap[vm.Name]; ok {
+					pods = append(pods, pod)
+					isBreak = true
+					break
+				}
+			}
+		}
+		for _, c := range pod.InitContainers {
+			if isBreak {
+				break
+			}
+			for _, vm := range c.VolumeMounts {
+				if _, ok := nameMap[vm.Name]; ok {
+					pods = append(pods, pod)
+					isBreak = true
+					break
+				}
+			}
+		}
+	}
+	return pods
 }

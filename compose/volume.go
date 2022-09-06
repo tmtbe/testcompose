@@ -2,37 +2,41 @@ package compose
 
 import (
 	"context"
-	"github.com/docker/docker/api/types"
 	"podcompose/docker"
 )
 
 type Volume struct {
-	volumes             []*VolumeConfig
-	dockerProvider      *docker.DockerProvider
-	createVolumesResult []*types.Volume
+	volumes        []*VolumeConfig
+	dockerProvider *docker.DockerProvider
 }
 
 func NewVolumes(volumes []*VolumeConfig, dockerProvider *docker.DockerProvider) *Volume {
 	return &Volume{
-		volumes:             volumes,
-		dockerProvider:      dockerProvider,
-		createVolumesResult: make([]*types.Volume, 0),
+		volumes:        volumes,
+		dockerProvider: dockerProvider,
 	}
 }
 
 func (v *Volume) createVolumes(ctx context.Context, sessionId string) error {
 	for _, volume := range v.volumes {
-		createVolume, err := v.dockerProvider.CreateVolume(ctx, volume.Name+"_"+sessionId, sessionId)
+		_, err := v.dockerProvider.CreateVolume(ctx, volume.Name+"_"+sessionId, sessionId)
 		if err != nil {
 			return err
 		}
-		v.createVolumesResult = append(v.createVolumesResult, &createVolume)
 	}
 	return nil
 }
 
-func (v *Volume) clean(ctx context.Context) {
-	for _, cvr := range v.createVolumesResult {
-		_ = v.dockerProvider.RemoveVolume(ctx, cvr.Name, true)
+func (v *Volume) reCreateVolumes(ctx context.Context, names []string, sessionId string) error {
+	err := v.dockerProvider.RemoveVolumes(ctx, names, true)
+	if err != nil {
+		return err
 	}
+	for _, name := range names {
+		_, err := v.dockerProvider.CreateVolume(ctx, name, sessionId)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

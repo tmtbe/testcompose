@@ -434,7 +434,27 @@ func (p *DockerProvider) CreateVolume(ctx context.Context, name string, sessionI
 		},
 	})
 }
-
+func (p *DockerProvider) RemoveVolumes(ctx context.Context, volumeNames []string, force bool) error {
+	vnMap := make(map[string]string)
+	for _, vn := range volumeNames {
+		vnMap[vn] = vn
+	}
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
+	fj, _ := filters.FromJSON(filtersJSON)
+	volumeList, err := p.client.VolumeList(ctx, fj)
+	if err != nil {
+		return err
+	}
+	for _, v := range volumeList.Volumes {
+		if _, ok := vnMap[v.Name]; ok {
+			err = p.client.VolumeRemove(ctx, v.Name, force)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 func (p *DockerProvider) RemoveVolume(ctx context.Context, volumeID string, force bool) error {
 	return p.client.VolumeRemove(ctx, volumeID, force)
 }
@@ -494,6 +514,30 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 			}
 		}
 	}
+}
+
+func (p *DockerProvider) RemoveContainer(ctx context.Context, id string) error {
+	return p.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
+		Force: true,
+	})
+}
+
+func (p *DockerProvider) FindContainers(ctx context.Context, sessionId string) ([]types.Container, error) {
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
+	fj, _ := filters.FromJSON(filtersJSON)
+	list, err := p.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: fj,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]types.Container, 0)
+	for _, c := range list {
+		if c.Labels[ComposeSessionID] == sessionId {
+			result = append(result, c)
+		}
+	}
+	return result, nil
 }
 
 func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) {
