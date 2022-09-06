@@ -51,7 +51,9 @@ func start() error {
 		return err
 	}
 	go func() {
-		_ = runner.start()
+		if err = runner.start(); err != nil {
+			panic(err)
+		}
 	}()
 	if err = runner.startWebServer(); err != nil {
 		return err

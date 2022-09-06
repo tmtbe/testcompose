@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
+	"path/filepath"
 	"podcompose/common"
 	"podcompose/docker"
 )
@@ -17,8 +18,12 @@ type Compose struct {
 }
 
 func NewCompose(configBytes []byte, sessionId string, contextPath string) (*Compose, error) {
+	contextPath, err := filepath.Abs(contextPath)
+	if err != nil {
+		return nil, err
+	}
 	var config ComposeConfig
-	err := yaml.Unmarshal(configBytes, &config)
+	err = yaml.Unmarshal(configBytes, &config)
 	if err != nil {
 		return nil, err
 	}

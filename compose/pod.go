@@ -176,6 +176,5 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		User:            c.User,
 		Env:             c.Env,
 		WaitingFor:      p.createWaitingFor(isInit, c),
-		AutoRemove:      true,
 	}, p.sessionId)
 }

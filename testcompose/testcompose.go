@@ -18,10 +18,6 @@ type TestCompose struct {
 }
 
 func NewTestCompose(workspace string, sessionId string) (*TestCompose, error) {
-	workspace, err := filepath.Abs(workspace)
-	if err != nil {
-		return nil, err
-	}
 	configByte, err := os.ReadFile(filepath.Join(workspace, common.ConfigFileName))
 	if err != nil {
 		return nil, err
@@ -61,8 +57,7 @@ func (t *TestCompose) Start(ctx context.Context) error {
 		NetworkAliases: map[string][]string{
 			t.compose.GetConfig().GetNetworkName(): {"agent"},
 		},
-		Cmd:        []string{"start"},
-		AutoRemove: true,
+		Cmd: []string{"start"},
 	}, t.compose.GetConfig().SessionId)
 	if err != nil {
 		return err

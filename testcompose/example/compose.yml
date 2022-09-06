@@ -1,7 +1,7 @@
 version: 1
 volumes:
   - name: workdir
-    emptyDir: {}
+    hostPath: ./data1
 pods:
   - name: pod1
     containers:

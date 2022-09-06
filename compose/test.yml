@@ -2,7 +2,7 @@ version: 1
 network: test
 volumes:
   - name: workdir
-    emptyDir: {}
+    hostPath: .
 pods:
   - name: pod1
     containers:

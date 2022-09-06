@@ -2,11 +2,17 @@ package testcompose
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestTestCompose(t *testing.T) {
-	compose, err := NewTestCompose("./test", "")
+	getwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	compose, err := NewTestCompose(filepath.Join(getwd, "./example"), "")
 	if err != nil {
 		panic(err)
 	}

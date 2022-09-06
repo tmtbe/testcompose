@@ -5,7 +5,7 @@ RUN go mod tidy \
     && cd agent\
     && CGO_ENABLED=0 GOOS=linux go build -o agent
 
-FROM scratch
+FROM alpine
 WORKDIR /app
 COPY --from=builder /app/agent .
 EXPOSE 80

@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -89,9 +91,15 @@ func (r *Starter) copyDataToVolumes() error {
 		if v.HostPath != "" {
 			sourcePath := filepath.Join(common.AgentContextPath, v.HostPath)
 			targetPath := filepath.Join(common.AgentVolumePath, v.Name)
-			err := exec.Command("cp", "-r", sourcePath, targetPath).Run()
+			rd, err := ioutil.ReadDir(sourcePath)
 			if err != nil {
 				return err
+			}
+			for _, fi := range rd {
+				stdout, err := exec.Command("cp", "-r", filepath.Join(sourcePath, fi.Name()), targetPath).CombinedOutput()
+				if err != nil {
+					return errors.Wrap(err, string(stdout))
+				}
 			}
 		}
 	}
