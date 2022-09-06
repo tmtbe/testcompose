@@ -22,7 +22,7 @@ func NewVolumes(volumes []*VolumeConfig, dockerProvider *docker.DockerProvider) 
 
 func (v *Volume) createVolumes(ctx context.Context, sessionId string) error {
 	for _, volume := range v.volumes {
-		createVolume, err := v.dockerProvider.CreateVolume(ctx, volume.Name, sessionId)
+		createVolume, err := v.dockerProvider.CreateVolume(ctx, volume.Name+"_"+sessionId, sessionId)
 		if err != nil {
 			return err
 		}

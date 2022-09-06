@@ -11,8 +11,6 @@ import (
 	"podcompose/docker/wait"
 )
 
-const AgentImage = "podcompose/agent"
-
 type TestCompose struct {
 	compose        *compose.Compose
 	workspace      string
@@ -46,10 +44,10 @@ func (t *TestCompose) Start(ctx context.Context) error {
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(t.workspace, common.AgentContextPath))
 	for _, v := range t.compose.GetConfig().Volumes {
-		agentMounts = append(agentMounts, docker.VolumeMount(v.Name, docker.ContainerMountTarget(common.AgentVolumePath+v.Name)))
+		agentMounts = append(agentMounts, docker.VolumeMount(v.Name+"_"+t.compose.GetConfig().SessionId, docker.ContainerMountTarget(common.AgentVolumePath+v.Name)))
 	}
 	agentContainer, err := t.compose.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
-		Image:        AgentImage,
+		Image:        common.AgentImage,
 		Name:         "agent_" + t.compose.GetConfig().SessionId,
 		ExposedPorts: []string{common.AgentPort},
 		Mounts:       agentMounts,
@@ -63,6 +61,7 @@ func (t *TestCompose) Start(ctx context.Context) error {
 		NetworkAliases: map[string][]string{
 			t.compose.GetConfig().GetNetworkName(): {"agent"},
 		},
+		Cmd:        []string{"start"},
 		AutoRemove: true,
 	}, t.compose.GetConfig().SessionId)
 	if err != nil {

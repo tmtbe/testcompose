@@ -18,7 +18,7 @@ const (
 )
 
 type PodCompose struct {
-	sessionID      string
+	sessionId      string
 	orderPods      [][]*PodConfig
 	network        string
 	dockerProvider *docker.DockerProvider
@@ -34,7 +34,7 @@ func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerPr
 			network:        network,
 			dockerProvider: dockerProvider,
 			podContainers:  make(map[string][]docker.Container, 0),
-			sessionID:      sessionID,
+			sessionId:      sessionID,
 		}, nil
 	}
 }
@@ -82,7 +82,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	containers := make([]docker.Container, 0)
 	// create pause container
 	pauseContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
-		Name: pod.Name + "_" + p.sessionID,
+		Name: pod.Name + "_" + p.sessionId,
 		NetworkAliases: map[string][]string{
 			p.network: {pod.Name},
 		},
@@ -91,7 +91,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		DNS:        pod.Dns,
 		CapAdd:     []string{"NET_ADMIN", "NET_RAW"},
 		AutoRemove: true,
-	}, p.sessionID)
+	}, p.sessionId)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (p *PodCompose) createWaitingFor(isInit bool, c *ContainerConfig) wait.Stra
 func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Context, c *ContainerConfig, pauseId string) (docker.Container, error) {
 	containerMounts := make([]docker.ContainerMount, 0)
 	for _, vm := range c.VolumeMounts {
-		containerMount := docker.VolumeMount(vm.Name, docker.ContainerMountTarget(vm.MountPath))
+		containerMount := docker.VolumeMount(vm.Name+"_"+p.sessionId, docker.ContainerMountTarget(vm.MountPath))
 		containerMounts = append(containerMounts, containerMount)
 	}
 	var capAdd strslice.StrSlice
@@ -164,7 +164,7 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		capDrop = c.Cap.Drop
 	}
 	return p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
-		Name:            podName + "_" + c.Name + "_" + p.sessionID,
+		Name:            podName + "_" + c.Name + "_" + p.sessionId,
 		Image:           c.Image,
 		Cmd:             c.Command,
 		Privileged:      c.Privileged,
@@ -177,5 +177,5 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		Env:             c.Env,
 		WaitingFor:      p.createWaitingFor(isInit, c),
 		AutoRemove:      true,
-	}, p.sessionID)
+	}, p.sessionId)
 }

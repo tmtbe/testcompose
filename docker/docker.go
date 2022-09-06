@@ -10,6 +10,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -86,14 +87,20 @@ func (p *DockerProvider) setDefaultNetwork(ctx context.Context) error {
 	return nil
 }
 
+func (p *DockerProvider) CreateContainerAutoLabel(ctx context.Context, req ContainerRequest, sessionId string) (Container, error) {
+	return p.CreateContainer(ctx, req, sessionId, true)
+}
+
 // CreateContainer fulfills a request for a container without starting it
-func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerRequest, sessionId string) (Container, error) {
+func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerRequest, sessionId string, autoLabel bool) (Container, error) {
 	var err error
 	if req.Labels == nil {
 		req.Labels = make(map[string]string)
 	}
-	req.Labels[PodContainerLabel] = "true"
-	req.Labels[ComposeSessionID] = sessionId
+	if autoLabel {
+		req.Labels[PodContainerLabel] = "true"
+		req.Labels[ComposeSessionID] = sessionId
+	}
 
 	exposedPortSet, exposedPortMap, err := nat.ParsePortSpecs(req.ExposedPorts)
 	if err != nil {
@@ -287,7 +294,7 @@ func (p *DockerProvider) Health(ctx context.Context) (err error) {
 
 // RunContainer takes a RequestContainer as input, and it runs a container via the docker sdk
 func (p *DockerProvider) RunContainer(ctx context.Context, req ContainerRequest, sessionId string) (Container, error) {
-	c, err := p.CreateContainer(ctx, req, sessionId)
+	c, err := p.CreateContainerAutoLabel(ctx, req, sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -430,6 +437,63 @@ func (p *DockerProvider) CreateVolume(ctx context.Context, name string, sessionI
 
 func (p *DockerProvider) RemoveVolume(ctx context.Context, volumeID string, force bool) error {
 	return p.client.VolumeRemove(ctx, volumeID, force)
+}
+
+func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string) {
+	if sessionId == "" {
+		return
+	}
+	fmt.Println("sessionID:", sessionId)
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
+	fj, _ := filters.FromJSON(filtersJSON)
+	// clear container
+	containerList, err := p.client.ContainerList(ctx, types.ContainerListOptions{
+		All:     true,
+		Filters: fj,
+	})
+	if err == nil {
+		for _, c := range containerList {
+			if c.Labels[ComposeSessionID] == sessionId {
+				fmt.Println("remove container:", c.ID)
+				err = p.client.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{
+					RemoveVolumes: true,
+					RemoveLinks:   false,
+					Force:         true,
+				})
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			}
+		}
+	}
+	// clear volume
+	volumeList, err := p.client.VolumeList(ctx, fj)
+	if err == nil {
+		for _, v := range volumeList.Volumes {
+			if v.Labels[ComposeSessionID] == sessionId {
+				fmt.Println("remove volume:", v.Name)
+				err = p.client.VolumeRemove(ctx, v.Name, true)
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			}
+		}
+	}
+	// clear network
+	networkList, err := p.client.NetworkList(ctx, types.NetworkListOptions{
+		Filters: fj,
+	})
+	if err == nil {
+		for _, n := range networkList {
+			if n.Labels[ComposeSessionID] == sessionId {
+				fmt.Println("remove network:", n.Name)
+				err = p.client.NetworkRemove(ctx, n.ID)
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			}
+		}
+	}
 }
 
 func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) {

@@ -13,11 +13,11 @@ import (
 	"time"
 )
 
-type Runner struct {
+type Starter struct {
 	*compose.Compose
 }
 
-func NewRunner(workspace string, sessionId string) (*Runner, error) {
+func NewStarter(workspace string, sessionId string) (*Starter, error) {
 	workspace, err := filepath.Abs(workspace)
 	if err != nil {
 		return nil, err
@@ -30,12 +30,12 @@ func NewRunner(workspace string, sessionId string) (*Runner, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Runner{
+	return &Starter{
 		Compose: c,
 	}, nil
 }
 
-func (r *Runner) start() error {
+func (r *Starter) start() error {
 	err := r.copyDataToVolumes()
 	if err != nil {
 		return err
@@ -44,7 +44,7 @@ func (r *Runner) start() error {
 	return r.Compose.StartPods(ctx)
 }
 
-func (r *Runner) startWebServer() error {
+func (r *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
 	router := gin.Default()
 	router.GET(common.AgentHealthEndPoint, func(c *gin.Context) {
@@ -54,7 +54,7 @@ func (r *Runner) startWebServer() error {
 	})
 	router.GET(common.AgentShutdownEndPoint, func(c *gin.Context) {
 		ctx := context.Background()
-		r.Compose.Clean(ctx)
+		_ = r.Clean(ctx)
 		quit <- true
 		c.JSON(http.StatusOK, gin.H{
 			"message": "shutdown",
@@ -84,7 +84,7 @@ func (r *Runner) startWebServer() error {
 	return nil
 }
 
-func (r *Runner) copyDataToVolumes() error {
+func (r *Starter) copyDataToVolumes() error {
 	for _, v := range r.Compose.GetConfig().Volumes {
 		if v.HostPath != "" {
 			sourcePath := filepath.Join(common.AgentContextPath, v.HostPath)

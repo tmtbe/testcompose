@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
@@ -16,7 +15,11 @@ type ComposeConfig struct {
 }
 
 func (c *ComposeConfig) GetNetworkName() string {
-	return c.Network + "_" + c.SessionId
+	if c.Network == "" {
+		return "PodTestComposeNetwork_" + c.SessionId
+	} else {
+		return c.Network
+	}
 }
 
 func (c *ComposeConfig) check(contextPath string) error {
@@ -25,13 +28,6 @@ func (c *ComposeConfig) check(contextPath string) error {
 	}
 	if c.SessionId == "" {
 		return errors.New("not init session id")
-	}
-	if c.Network == "" {
-		networkUUID, err := uuid.NewUUID()
-		if err != nil {
-			return err
-		}
-		c.Network = networkUUID.String()
 	}
 	podMap := make(map[string]string)
 	for _, pod := range c.Pods {

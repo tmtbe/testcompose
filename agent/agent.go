@@ -8,6 +8,19 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use: "agent",
+}
+var cleanCmd = &cobra.Command{
+	Use: "clean",
+	Run: func(cmd *cobra.Command, args []string) {
+		err := clean()
+		if err != nil {
+			panic(err)
+		}
+	},
+}
+
+var startCmd = &cobra.Command{
+	Use: "start",
 	Run: func(cmd *cobra.Command, args []string) {
 		err := start()
 		if err != nil {
@@ -16,14 +29,29 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+func init() {
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(cleanCmd)
+}
+
+func clean() error {
+	sessionId := os.Getenv(common.AgentSessionID)
+	cleaner, err := NewCleaner(sessionId)
+	if err != nil {
+		return err
+	}
+	cleaner.clear()
+	return nil
+}
+
 func start() error {
 	sessionId := os.Getenv(common.AgentSessionID)
-	runner, err := NewRunner(common.AgentContextPath, sessionId)
+	runner, err := NewStarter(common.AgentContextPath, sessionId)
 	if err != nil {
 		return err
 	}
 	go func() {
-		runner.start()
+		_ = runner.start()
 	}()
 	if err = runner.startWebServer(); err != nil {
 		return err
