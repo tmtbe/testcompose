@@ -27,7 +27,7 @@ func (v *Volume) createVolumes(ctx context.Context, sessionId string) error {
 	return nil
 }
 
-func (v *Volume) reCreateVolumes(ctx context.Context, names []string, sessionId string) error {
+func (v *Volume) recreateVolumes(ctx context.Context, names []string, sessionId string) error {
 	err := v.dockerProvider.RemoveVolumes(ctx, names, true)
 	if err != nil {
 		return err

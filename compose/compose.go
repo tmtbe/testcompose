@@ -211,6 +211,34 @@ func (c *Compose) StartAgentForSwitchData(ctx context.Context, selectData map[st
 	return cc.Start(ctx)
 }
 
+func (c *Compose) StartAgentForRestart(ctx context.Context, selectData []string) error {
+	agentMounts := make([]docker.ContainerMount, 0)
+	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
+	agentMounts = append(agentMounts, docker.BindMount(c.getContextPathForMount(), common.AgentContextPath))
+	cmd := make([]string, 0)
+	cmd = append(cmd, "restart")
+	for _, podName := range selectData {
+		cmd = append(cmd, "-s")
+		cmd = append(cmd, podName)
+	}
+	cc, err := c.GetDockerProvider().CreateContainer(ctx, docker.ContainerRequest{
+		Image: common.AgentImage,
+		Name:  "agent_restart_" + c.GetConfig().SessionId,
+		Env: map[string]string{
+			common.AgentSessionID:  c.GetConfig().SessionId,
+			common.HostContextPath: c.getContextPathForMount(),
+		},
+		Mounts:     agentMounts,
+		WaitingFor: wait.ForExit(),
+		Cmd:        cmd,
+		AutoRemove: AgentAutoRemove,
+	}, c.GetConfig().SessionId, false)
+	if err != nil {
+		return err
+	}
+	return cc.Start(ctx)
+}
+
 func (c *Compose) StartPods(ctx context.Context) error {
 	return c.podCompose.start(ctx)
 }
@@ -219,18 +247,14 @@ func (c *Compose) CreateVolumes(ctx context.Context) error {
 	return c.volume.createVolumes(ctx, c.GetConfig().SessionId)
 }
 
-func (c *Compose) ReCreateVolumes(ctx context.Context, names []string) error {
-	return c.volume.reCreateVolumes(ctx, names, c.GetConfig().SessionId)
+func (c *Compose) RecreateVolumes(ctx context.Context, names []string) error {
+	return c.volume.recreateVolumes(ctx, names, c.GetConfig().SessionId)
 }
 
 func (c *Compose) FindPodsWhoUsedVolumes(volumeNames []string) []*PodConfig {
 	return c.podCompose.findPodsWhoUsedVolumes(volumeNames)
 }
 
-func (c *Compose) RestartPods(ctx context.Context, pods []*PodConfig, beforeStart func() error) error {
-	podNames := make([]string, len(pods))
-	for k, v := range pods {
-		podNames[k] = v.Name
-	}
+func (c *Compose) RestartPods(ctx context.Context, podNames []string, beforeStart func() error) error {
 	return c.podCompose.RestartPods(ctx, podNames, beforeStart)
 }

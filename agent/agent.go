@@ -57,7 +57,17 @@ func main() {
 			}
 		},
 	}
-	reStartCmd := &cobra.Command{
+	restartCmd := &cobra.Command{
+		Use: "restart",
+		Run: func(cmd *cobra.Command, args []string) {
+			podNames, err := cmd.Flags().GetStringArray("select")
+			if err = runner.restart(podNames); err != nil {
+				panic(err)
+			}
+		},
+	}
+	restartCmd.Flags().StringArrayP("select", "s", []string{}, "select pod to restart")
+	switchCmd := &cobra.Command{
 		Use: "switch",
 		Run: func(cmd *cobra.Command, args []string) {
 			selectArr, err := cmd.Flags().GetStringArray("select")
@@ -75,9 +85,10 @@ func main() {
 			}
 		},
 	}
-	reStartCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
+	switchCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
 	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(reStartCmd)
+	rootCmd.AddCommand(restartCmd)
+	rootCmd.AddCommand(switchCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(prepareVolumeDataCmd)
 	err = rootCmd.Execute()

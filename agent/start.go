@@ -54,6 +54,13 @@ func (s *Starter) start() error {
 	return s.Compose.StartPods(ctx)
 }
 
+func (s *Starter) restart(podNames []string) error {
+	ctx := context.Background()
+	return s.Compose.RestartPods(ctx, podNames, func() error {
+		return nil
+	})
+}
+
 func (s *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
 	router := gin.Default()
@@ -72,7 +79,29 @@ func (s *Starter) startWebServer() error {
 	})
 	router.POST(common.AgentSwitchDataEndPoint, func(c *gin.Context) {
 		ctx := context.Background()
-		type RestartBody map[string]string
+		type SwitchDataBody map[string]string
+		var switchDataBody SwitchDataBody
+		err := c.BindJSON(&switchDataBody)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+		err = s.StartAgentForSwitchData(ctx, switchDataBody)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "switch data ok",
+		})
+	})
+	router.POST(common.AgentRestartEndPoint, func(c *gin.Context) {
+		ctx := context.Background()
+		type RestartBody []string
 		var restartBody RestartBody
 		err := c.BindJSON(&restartBody)
 		if err != nil {
@@ -81,9 +110,15 @@ func (s *Starter) startWebServer() error {
 			})
 			return
 		}
-		_ = s.StartAgentForSwitchData(ctx, restartBody)
+		err = s.StartAgentForRestart(ctx, restartBody)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{
-			"message": "switchData ok",
+			"message": "restart ok",
 		})
 	})
 	srv := &http.Server{
@@ -117,8 +152,12 @@ func (s *Starter) switchData(selectData map[string]string) error {
 		volumeNames = append(volumeNames, volumeName)
 	}
 	pods := s.Compose.FindPodsWhoUsedVolumes(volumeNames)
-	return s.Compose.RestartPods(ctx, pods, func() error {
-		err := s.Compose.ReCreateVolumes(ctx, volumeNames)
+	podNames := make([]string, len(pods))
+	for k, v := range pods {
+		podNames[k] = v.Name
+	}
+	return s.Compose.RestartPods(ctx, podNames, func() error {
+		err := s.Compose.RecreateVolumes(ctx, volumeNames)
 		if err != nil {
 			return err
 		}
