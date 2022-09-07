@@ -2,20 +2,20 @@ package main
 
 import (
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"os"
 	"podcompose/common"
 	"strings"
 )
 
 func main() {
+	InitLogger()
 	sessionId := os.Getenv(common.AgentSessionID)
 	hostContextPath := os.Getenv(common.HostContextPath)
 	runner, err := NewStarter(common.AgentContextPath, sessionId, hostContextPath)
 	volume, err := NewVolume(common.AgentContextPath, sessionId)
 	cleaner, err := NewCleaner(sessionId)
-	if err != nil {
-		panic(err)
-	}
+	handleError(err)
 	rootCmd := &cobra.Command{
 		Use: "agent",
 	}
@@ -29,18 +29,14 @@ func main() {
 		Use: "prepareVolumeData",
 		Run: func(cmd *cobra.Command, args []string) {
 			selectArr, err := cmd.Flags().GetStringArray("select")
-			if err != nil {
-				panic(err)
-			}
+			handleError(err)
 			selectMap := make(map[string]string)
 			for _, selectGroup := range selectArr {
 				selectGroupSplit := strings.Split(selectGroup, "=")
 				selectMap[selectGroupSplit[0]] = selectGroupSplit[1]
 			}
 			err = volume.copyDataToVolumes(selectMap)
-			if err != nil {
-				panic(err)
-			}
+			handleError(err)
 		},
 	}
 	prepareVolumeDataCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
@@ -49,11 +45,11 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			go func() {
 				if err = runner.start(); err != nil {
-					panic(err)
+					handleError(err)
 				}
 			}()
 			if err = runner.startWebServer(); err != nil {
-				panic(err)
+				handleError(err)
 			}
 		},
 	}
@@ -62,7 +58,7 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			podNames, err := cmd.Flags().GetStringArray("select")
 			if err = runner.restart(podNames); err != nil {
-				panic(err)
+				handleError(err)
 			}
 		},
 	}
@@ -71,18 +67,14 @@ func main() {
 		Use: "switch",
 		Run: func(cmd *cobra.Command, args []string) {
 			selectArr, err := cmd.Flags().GetStringArray("select")
-			if err != nil {
-				panic(err)
-			}
+			handleError(err)
 			selectMap := make(map[string]string)
 			for _, selectGroup := range selectArr {
 				selectGroupSplit := strings.Split(selectGroup, "=")
 				selectMap[selectGroupSplit[0]] = selectGroupSplit[1]
 			}
 			err = runner.switchData(selectMap)
-			if err != nil {
-				panic(err)
-			}
+			handleError(err)
 		},
 	}
 	switchCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
@@ -92,7 +84,12 @@ func main() {
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(prepareVolumeDataCmd)
 	err = rootCmd.Execute()
+	handleError(err)
+}
+
+func handleError(err error) {
 	if err != nil {
-		panic(err)
+		zap.L().Sugar().Error(err)
+		os.Exit(1)
 	}
 }

@@ -1,14 +1,17 @@
 package compose
 
 import (
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
+	"io/ioutil"
 	"path/filepath"
 	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
+	"strings"
 )
 
 const AgentAutoRemove = true
@@ -58,36 +61,6 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string) (*Comp
 	}, nil
 }
 
-func (c *Compose) GetConfig() *ComposeConfig {
-	return c.config
-}
-
-func (c *Compose) GetDockerProvider() *docker.DockerProvider {
-	return c.dockerProvider
-}
-
-// PrepareNetwork network and volumes should be init before agent start
-func (c *Compose) PrepareNetwork(ctx context.Context) error {
-	if c.config.Network == "" {
-		_, err := c.dockerProvider.CreateNetwork(ctx, docker.NetworkRequest{
-			Driver:         docker.Bridge,
-			CheckDuplicate: true,
-			Name:           c.config.GetNetworkName(),
-		}, c.config.SessionId)
-		if err != nil {
-			return err
-		}
-	} else {
-		_, err := c.dockerProvider.GetNetwork(ctx, docker.NetworkRequest{
-			Name: c.config.Network,
-		})
-		if err != nil {
-			return errors.Errorf("network: %s is not exist", c.config.Network)
-		}
-	}
-	return nil
-}
-
 func (c *Compose) StartAgentForServer(ctx context.Context) (docker.Container, error) {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
@@ -113,17 +86,6 @@ func (c *Compose) StartAgentForServer(ctx context.Context) (docker.Container, er
 	}, c.GetConfig().SessionId)
 }
 
-func (c *Compose) SetHostContextPath(path string) {
-	c.hostContextPath = path
-}
-
-func (c *Compose) getContextPathForMount() string {
-	if c.hostContextPath != "" {
-		return c.hostContextPath
-	} else {
-		return c.contextPath
-	}
-}
 func (c *Compose) StartAgentForSetVolume(ctx context.Context, selectData map[string]string) error {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
@@ -151,12 +113,11 @@ func (c *Compose) StartAgentForSetVolume(ctx context.Context, selectData map[str
 		Mounts:     agentMounts,
 		WaitingFor: wait.ForExit(),
 		Cmd:        cmd,
-		AutoRemove: AgentAutoRemove,
 	}, c.GetConfig().SessionId, false)
 	if err != nil {
 		return err
 	}
-	return cc.Start(ctx)
+	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
 }
 
 func (c *Compose) StartAgentForClean(ctx context.Context) error {
@@ -167,13 +128,12 @@ func (c *Compose) StartAgentForClean(ctx context.Context) error {
 		Env: map[string]string{
 			common.AgentSessionID: c.GetConfig().SessionId,
 		},
-		Cmd:        []string{"clean"},
-		AutoRemove: AgentAutoRemove,
+		Cmd: []string{"clean"},
 	}, c.GetConfig().SessionId, false)
 	if err != nil {
 		return err
 	}
-	return cc.Start(ctx)
+	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
 }
 
 func (c *Compose) StartAgentForSwitchData(ctx context.Context, selectData map[string]string) error {
@@ -203,12 +163,11 @@ func (c *Compose) StartAgentForSwitchData(ctx context.Context, selectData map[st
 		Mounts:     agentMounts,
 		WaitingFor: wait.ForExit(),
 		Cmd:        cmd,
-		AutoRemove: AgentAutoRemove,
 	}, c.GetConfig().SessionId, false)
 	if err != nil {
 		return err
 	}
-	return cc.Start(ctx)
+	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
 }
 
 func (c *Compose) StartAgentForRestart(ctx context.Context, selectData []string) error {
@@ -231,12 +190,52 @@ func (c *Compose) StartAgentForRestart(ctx context.Context, selectData []string)
 		Mounts:     agentMounts,
 		WaitingFor: wait.ForExit(),
 		Cmd:        cmd,
-		AutoRemove: AgentAutoRemove,
 	}, c.GetConfig().SessionId, false)
 	if err != nil {
 		return err
 	}
-	return cc.Start(ctx)
+	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
+}
+
+func (c *Compose) runAndGetAgentError(ctx context.Context, container docker.Container, remove bool) error {
+	if err := container.Start(ctx); err != nil {
+		return err
+	}
+	if remove {
+		defer c.dockerProvider.RemoveContainer(ctx, container.GetContainerID())
+	}
+	state, err := container.State(ctx)
+	if err != nil {
+		return err
+	}
+	if state.ExitCode != 0 {
+		logs, err := container.Logs(ctx)
+		if err != nil {
+			return err
+		}
+		all, err := ioutil.ReadAll(logs)
+		if err != nil {
+			return err
+		}
+		log := string(all)
+		lines := strings.Split(log, "\n")
+		for _, line := range lines {
+			split := strings.SplitN(line, "{", 2)
+			jsonLog := "{" + split[1]
+			var logStruct struct {
+				Level string `json:"level"`
+				Msg   string `json:"msg"`
+			}
+			err := json.Unmarshal([]byte(jsonLog), &logStruct)
+			if err == nil {
+				if logStruct.Level == "error" {
+					return errors.New(logStruct.Msg)
+				}
+			}
+		}
+		return errors.New(log)
+	}
+	return nil
 }
 
 func (c *Compose) StartPods(ctx context.Context) error {
@@ -256,5 +255,52 @@ func (c *Compose) FindPodsWhoUsedVolumes(volumeNames []string) []*PodConfig {
 }
 
 func (c *Compose) RestartPods(ctx context.Context, podNames []string, beforeStart func() error) error {
+	for _, podName := range podNames {
+		if _, ok := c.podCompose.pods[podName]; !ok {
+			return errors.Errorf("pod name:%s is not exist", podName)
+		}
+	}
 	return c.podCompose.RestartPods(ctx, podNames, beforeStart)
+}
+
+func (c *Compose) SetHostContextPath(path string) {
+	c.hostContextPath = path
+}
+
+func (c *Compose) getContextPathForMount() string {
+	if c.hostContextPath != "" {
+		return c.hostContextPath
+	} else {
+		return c.contextPath
+	}
+}
+
+func (c *Compose) GetConfig() *ComposeConfig {
+	return c.config
+}
+
+func (c *Compose) GetDockerProvider() *docker.DockerProvider {
+	return c.dockerProvider
+}
+
+// PrepareNetwork network and volumes should be init before agent start
+func (c *Compose) PrepareNetwork(ctx context.Context) error {
+	if c.config.Network == "" {
+		_, err := c.dockerProvider.CreateNetwork(ctx, docker.NetworkRequest{
+			Driver:         docker.Bridge,
+			CheckDuplicate: true,
+			Name:           c.config.GetNetworkName(),
+		}, c.config.SessionId)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err := c.dockerProvider.GetNetwork(ctx, docker.NetworkRequest{
+			Name: c.config.Network,
+		})
+		if err != nil {
+			return errors.Errorf("network: %s is not exist", c.config.Network)
+		}
+	}
+	return nil
 }
