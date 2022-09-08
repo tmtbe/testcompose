@@ -11,3 +11,12 @@ pods:
         volumeMounts:
           - name: workdir
             mountPath: "/work-dir"
+  - name: pod2
+    depends:
+      - pod1
+    containers:
+      - name: nginx
+        image: nginx
+        volumeMounts:
+          - name: workdir
+            mountPath: "/work-dir"

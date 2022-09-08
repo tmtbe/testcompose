@@ -2,8 +2,8 @@ package compose
 
 import (
 	"encoding/json"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/sony/sonyflake"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -11,6 +11,7 @@ import (
 	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
+	"strconv"
 	"strings"
 )
 
@@ -37,8 +38,7 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string) (*Comp
 	}
 	config.SessionId = sessionId
 	if config.SessionId == "" {
-		sessionUUID, _ := uuid.NewUUID()
-		config.SessionId = sessionUUID.String()
+		config.SessionId = genSessionId()
 	}
 	err = config.check(contextPath)
 	if err != nil {
@@ -61,13 +61,19 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string) (*Comp
 	}, nil
 }
 
+func genSessionId() string {
+	var st sonyflake.Settings
+	id, _ := sonyflake.NewSonyflake(st).NextID()
+	return strconv.FormatInt(int64(id), 16)
+}
+
 func (c *Compose) StartAgentForServer(ctx context.Context) (docker.Container, error) {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(c.getContextPathForMount(), common.AgentContextPath))
 	return c.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
 		Image:        common.AgentImage,
-		Name:         "agent_" + c.GetConfig().SessionId,
+		Name:         ContainerNamePrefix + "agent_" + c.GetConfig().SessionId,
 		ExposedPorts: []string{common.AgentPort},
 		Mounts:       agentMounts,
 		WaitingFor: wait.ForHTTP(common.AgentHealthEndPoint).
@@ -103,37 +109,32 @@ func (c *Compose) StartAgentForSetVolume(ctx context.Context, selectData map[str
 			agentMounts = append(agentMounts, docker.VolumeMount(volumeName, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
 		}
 	}
-	cc, err := c.GetDockerProvider().CreateContainer(ctx, docker.ContainerRequest{
+	return c.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.AgentImage,
-		Name:  "agent_volume_" + c.GetConfig().SessionId,
+		Name:  ContainerNamePrefix + "agent_volume_" + c.GetConfig().SessionId,
 		Env: map[string]string{
 			common.AgentSessionID:  c.GetConfig().SessionId,
 			common.HostContextPath: c.getContextPathForMount(),
 		},
-		Mounts:     agentMounts,
-		WaitingFor: wait.ForExit(),
-		Cmd:        cmd,
-	}, c.GetConfig().SessionId, false)
-	if err != nil {
-		return err
-	}
-	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
+		Mounts: agentMounts,
+		Cmd:    cmd,
+	}, AgentAutoRemove)
 }
 
 func (c *Compose) StartAgentForClean(ctx context.Context) error {
-	cc, err := c.GetDockerProvider().CreateContainer(ctx, docker.ContainerRequest{
+	return c.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image:  common.AgentImage,
 		Mounts: docker.Mounts(docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock")),
-		Name:   "agent_clean_" + c.GetConfig().SessionId,
+		Name:   ContainerNamePrefix + "agent_clean_" + c.GetConfig().SessionId,
 		Env: map[string]string{
 			common.AgentSessionID: c.GetConfig().SessionId,
 		},
 		Cmd: []string{"clean"},
-	}, c.GetConfig().SessionId, false)
-	if err != nil {
-		return err
-	}
-	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
+		Labels: map[string]string{
+			docker.IsCleaner: "true",
+		},
+		AutoRemove: AgentAutoRemove, //clean must set auto remove,agent cannot remove clean container
+	}, AgentAutoRemove)
 }
 
 func (c *Compose) StartAgentForSwitchData(ctx context.Context, selectData map[string]string) error {
@@ -153,21 +154,16 @@ func (c *Compose) StartAgentForSwitchData(ctx context.Context, selectData map[st
 			agentMounts = append(agentMounts, docker.VolumeMount(volumeName, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
 		}
 	}
-	cc, err := c.GetDockerProvider().CreateContainer(ctx, docker.ContainerRequest{
+	return c.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.AgentImage,
-		Name:  "agent_switch_" + c.GetConfig().SessionId,
+		Name:  ContainerNamePrefix + "agent_switch_" + c.GetConfig().SessionId,
 		Env: map[string]string{
 			common.AgentSessionID:  c.GetConfig().SessionId,
 			common.HostContextPath: c.getContextPathForMount(),
 		},
-		Mounts:     agentMounts,
-		WaitingFor: wait.ForExit(),
-		Cmd:        cmd,
-	}, c.GetConfig().SessionId, false)
-	if err != nil {
-		return err
-	}
-	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
+		Mounts: agentMounts,
+		Cmd:    cmd,
+	}, AgentAutoRemove)
 }
 
 func (c *Compose) StartAgentForRestart(ctx context.Context, selectData []string) error {
@@ -180,24 +176,25 @@ func (c *Compose) StartAgentForRestart(ctx context.Context, selectData []string)
 		cmd = append(cmd, "-s")
 		cmd = append(cmd, podName)
 	}
-	cc, err := c.GetDockerProvider().CreateContainer(ctx, docker.ContainerRequest{
+	return c.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.AgentImage,
-		Name:  "agent_restart_" + c.GetConfig().SessionId,
+		Name:  ContainerNamePrefix + "agent_restart_" + c.GetConfig().SessionId,
 		Env: map[string]string{
 			common.AgentSessionID:  c.GetConfig().SessionId,
 			common.HostContextPath: c.getContextPathForMount(),
 		},
-		Mounts:     agentMounts,
-		WaitingFor: wait.ForExit(),
-		Cmd:        cmd,
-	}, c.GetConfig().SessionId, false)
+		Mounts: agentMounts,
+		Cmd:    cmd,
+	}, AgentAutoRemove)
+}
+
+// must use waitingFor exit
+func (c *Compose) runAndGetAgentError(ctx context.Context, containerRequest docker.ContainerRequest, remove bool) error {
+	containerRequest.WaitingFor = wait.ForExit()
+	container, err := c.GetDockerProvider().CreateContainerAutoLabel(ctx, containerRequest, c.config.SessionId)
 	if err != nil {
 		return err
 	}
-	return c.runAndGetAgentError(ctx, cc, AgentAutoRemove)
-}
-
-func (c *Compose) runAndGetAgentError(ctx context.Context, container docker.Container, remove bool) error {
 	if err := container.Start(ctx); err != nil {
 		return err
 	}

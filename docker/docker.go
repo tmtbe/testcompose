@@ -36,6 +36,7 @@ const (
 	Host              = "DOCKER_HOST"
 	PodContainerLabel = "PodContainer"
 	ComposeSessionID  = "ComposeSessionID"
+	IsCleaner         = "cleaner"
 )
 
 var (
@@ -474,6 +475,9 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 	if err == nil {
 		for _, c := range containerList {
 			if c.Labels[ComposeSessionID] == sessionId {
+				if c.Labels[IsCleaner] == "true" {
+					continue
+				}
 				fmt.Println("remove container:", c.ID)
 				err = p.client.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{
 					RemoveVolumes: true,

@@ -71,7 +71,9 @@ func (s *Starter) startWebServer() error {
 	})
 	router.GET(common.AgentShutdownEndPoint, func(c *gin.Context) {
 		ctx := context.Background()
-		_ = s.StartAgentForClean(ctx)
+		go func() {
+			_ = s.StartAgentForClean(ctx)
+		}()
 		quit <- true
 		c.JSON(http.StatusOK, gin.H{
 			"message": "shutdown",

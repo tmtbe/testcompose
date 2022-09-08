@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	PauseImage      = "gcr.io/google_containers/pause:3.0"
-	InitExitTimeOut = 60000
-	PodName         = "PDO_NAME"
+	PauseImage          = "gcr.io/google_containers/pause:3.0"
+	InitExitTimeOut     = 60000
+	PodName             = "PDO_NAME"
+	ContainerNamePrefix = "tpc_"
 )
 
 type PodCompose struct {
@@ -47,7 +48,9 @@ func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerPr
 
 func (p *PodCompose) start(ctx context.Context) error {
 	for _, pods := range p.orderPods {
-		return p.concurrencyCreatePods(ctx, pods)
+		if err := p.concurrencyCreatePods(ctx, pods); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -81,7 +84,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	containers := make([]docker.Container, 0)
 	// create pause container
 	pauseContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
-		Name: pod.Name + "_" + p.sessionId,
+		Name: ContainerNamePrefix + pod.Name + "_pause_" + p.sessionId,
 		NetworkAliases: map[string][]string{
 			p.network: {pod.Name},
 		},
@@ -165,7 +168,7 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		capDrop = c.Cap.Drop
 	}
 	return p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
-		Name:            podName + "_" + c.Name + "_" + p.sessionId,
+		Name:            ContainerNamePrefix + podName + "_" + c.Name + "_" + p.sessionId,
 		Image:           c.Image,
 		Cmd:             c.Command,
 		Privileged:      c.Privileged,

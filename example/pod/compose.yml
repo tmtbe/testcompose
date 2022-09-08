@@ -1,0 +1,31 @@
+version: 1
+volumes:
+  - name: tmp
+    emptyDir: {}
+  - name: wlp-output
+    emptyDir: {}
+pods:
+  - name: ratings
+    containers:
+      - name: ratings
+        image: docker.io/istio/examples-bookinfo-ratings-v1:1.17.0
+  - name: reviews
+    depends:
+      - ratings
+    containers:
+      - name: reviews
+        image: docker.io/istio/examples-bookinfo-reviews-v2:1.17.0
+        env:
+          LOG_DIR: "/tmp/logs"
+        volumeMounts:
+          - name: wlp-output
+            mountPath: "/opt/ibm/wlp/output"
+  - name: productpage
+    depends:
+      - reviews
+    containers:
+      - name: productpage
+        image: docker.io/istio/examples-bookinfo-productpage-v1:1.17.0
+        volumeMounts:
+          - name: tmp
+            mountPath: "/tmp"

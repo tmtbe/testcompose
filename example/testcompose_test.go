@@ -1,9 +1,10 @@
-package testcompose
+package example
 
 import (
 	"context"
 	"os"
 	"path/filepath"
+	"podcompose/testcompose"
 	"testing"
 )
 
@@ -12,7 +13,7 @@ func TestTestCompose(t *testing.T) {
 	if err != nil {
 		return
 	}
-	compose, err := NewTestCompose(filepath.Join(getwd, "./example"), "")
+	compose, err := testcompose.NewTestCompose(filepath.Join(getwd, "./pod"), "")
 	if err != nil {
 		panic(err)
 	}
