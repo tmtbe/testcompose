@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
@@ -63,7 +64,10 @@ func (s *Starter) restart(podNames []string) error {
 
 func (s *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
-	router := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(ginzap.Ginzap(zap.L(), time.RFC3339, true))
+	router.Use(ginzap.RecoveryWithZap(zap.L(), true))
 	router.GET(common.AgentHealthEndPoint, func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "ok",

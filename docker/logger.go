@@ -1,13 +1,19 @@
 package docker
 
 import (
-	"log"
-	"os"
+	"go.uber.org/zap"
 	"testing"
 )
 
 // Logger is the default log instance
-var Logger Logging = log.New(os.Stderr, "", log.LstdFlags)
+var Logger Logging = &ZapLog{}
+
+type ZapLog struct {
+}
+
+func (z *ZapLog) Printf(format string, v ...interface{}) {
+	zap.L().Sugar().Debugf(format, v...)
+}
 
 // Logging defines the Logger interface
 type Logging interface {

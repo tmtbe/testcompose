@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -464,7 +465,7 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 	if sessionId == "" {
 		return
 	}
-	fmt.Println("sessionID:", sessionId)
+	zap.L().Sugar().Infof("sessionID:%s", sessionId)
 	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
 	fj, _ := filters.FromJSON(filtersJSON)
 	// clear container
@@ -478,14 +479,14 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 				if c.Labels[IsCleaner] == "true" {
 					continue
 				}
-				fmt.Println("remove container:", c.ID)
+				zap.L().Sugar().Infof("remove container:%s", c.ID)
 				err = p.client.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{
 					RemoveVolumes: true,
 					RemoveLinks:   false,
 					Force:         true,
 				})
 				if err != nil {
-					fmt.Println(err.Error())
+					zap.L().Sugar().Error(err)
 				}
 			}
 		}
@@ -495,10 +496,10 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 	if err == nil {
 		for _, v := range volumeList.Volumes {
 			if v.Labels[ComposeSessionID] == sessionId {
-				fmt.Println("remove volume:", v.Name)
+				zap.L().Sugar().Infof("remove volume:%s", v.Name)
 				err = p.client.VolumeRemove(ctx, v.Name, true)
 				if err != nil {
-					fmt.Println(err.Error())
+					zap.L().Sugar().Error(err)
 				}
 			}
 		}
@@ -510,10 +511,10 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 	if err == nil {
 		for _, n := range networkList {
 			if n.Labels[ComposeSessionID] == sessionId {
-				fmt.Println("remove network:", n.Name)
+				zap.L().Sugar().Infof("remove network:%s", n.Name)
 				err = p.client.NetworkRemove(ctx, n.ID)
 				if err != nil {
-					fmt.Println(err.Error())
+					zap.L().Sugar().Error(err)
 				}
 			}
 		}
