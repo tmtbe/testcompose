@@ -16,7 +16,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
-	"github.com/google/uuid"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -79,6 +78,10 @@ func NewDockerProvider() (*DockerProvider, error) {
 	return p, nil
 }
 
+func (p *DockerProvider) GetClient() *client.Client {
+	return p.client
+}
+
 func (p *DockerProvider) GetDefaultNetwork() string {
 	return p.defaultNetwork
 }
@@ -121,8 +124,6 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 	if req.Labels == nil {
 		req.Labels = make(map[string]string)
 	}
-
-	sessionID := uuid.New()
 
 	var termSignal chan bool
 
@@ -253,7 +254,7 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 		ID:                resp.ID,
 		WaitingFor:        req.WaitingFor,
 		Image:             tag,
-		sessionID:         sessionID,
+		sessionId:         sessionId,
 		provider:          p,
 		terminationSignal: termSignal,
 		stopProducer:      make(chan bool),
@@ -461,15 +462,20 @@ func (p *DockerProvider) RemoveVolumes(ctx context.Context, volumeNames []string
 	}
 	return nil
 }
+
 func (p *DockerProvider) RemoveVolume(ctx context.Context, volumeID string, force bool) error {
 	return p.client.VolumeRemove(ctx, volumeID, force)
+}
+
+func (p *DockerProvider) RemoveNetwork(ctx context.Context, networkID string) error {
+	return p.client.NetworkRemove(ctx, networkID)
 }
 
 func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string) {
 	if sessionId == "" {
 		return
 	}
-	zap.L().Sugar().Infof("sessionID:%s", sessionId)
+	zap.L().Sugar().Infof("sessionId:%s", sessionId)
 	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
 	fj, _ := filters.FromJSON(filtersJSON)
 	// clear container
@@ -540,11 +546,7 @@ func (p *DockerProvider) FindAllPodContainers(ctx context.Context) ([]types.Cont
 	if err != nil {
 		return nil, err
 	}
-	result := make([]types.Container, 0)
-	for _, c := range list {
-		result = append(result, c)
-	}
-	return result, nil
+	return list, nil
 }
 
 func (p *DockerProvider) FindContainers(ctx context.Context, sessionId string) ([]types.Container, error) {
@@ -563,6 +565,28 @@ func (p *DockerProvider) FindContainers(ctx context.Context, sessionId string) (
 		}
 	}
 	return result, nil
+}
+
+func (p *DockerProvider) FindAllVolumes(ctx context.Context) ([]*types.Volume, error) {
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
+	fj, _ := filters.FromJSON(filtersJSON)
+	volumeListOKBody, err := p.client.VolumeList(ctx, fj)
+	if err != nil {
+		return nil, err
+	}
+	return volumeListOKBody.Volumes, nil
+}
+
+func (p *DockerProvider) FindAllNetworks(ctx context.Context) ([]types.NetworkResource, error) {
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
+	fj, _ := filters.FromJSON(filtersJSON)
+	networks, err := p.client.NetworkList(ctx, types.NetworkListOptions{
+		Filters: fj,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return networks, nil
 }
 
 func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) {
@@ -636,12 +660,25 @@ type DockerContainer struct {
 	WaitingFor        wait.Strategy
 	Image             string
 	provider          *DockerProvider
-	sessionID         uuid.UUID
+	sessionId         string
 	terminationSignal chan bool
 	consumers         []LogConsumer
 	raw               *types.ContainerJSON
 	stopProducer      chan bool
 	logger            Logging
+}
+
+func NewDockerContainer(id string, image string, provider *DockerProvider, sessionId string, terminationSignal chan bool) *DockerContainer {
+	return &DockerContainer{
+		ID:                id,
+		WaitingFor:        nil,
+		Image:             image,
+		provider:          provider,
+		sessionId:         sessionId,
+		terminationSignal: terminationSignal,
+		stopProducer:      make(chan bool),
+		logger:            Logger,
+	}
 }
 
 func (c *DockerContainer) GetContainerID() string {
@@ -739,7 +776,7 @@ func (c *DockerContainer) Ports(ctx context.Context) (nat.PortMap, error) {
 
 // SessionID gets the current session id
 func (c *DockerContainer) SessionID() string {
-	return c.sessionID.String()
+	return c.sessionId
 }
 
 // Start will start an already created container
@@ -803,8 +840,6 @@ func (c *DockerContainer) Terminate(ctx context.Context) error {
 	if err := c.provider.client.Close(); err != nil {
 		return err
 	}
-
-	c.sessionID = uuid.UUID{}
 	return nil
 }
 

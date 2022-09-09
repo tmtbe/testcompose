@@ -41,9 +41,21 @@ func main() {
 			handleError(plist.Ps())
 		},
 	}
+	cleanCmd := &cobra.Command{
+		Use: "clean",
+		Run: func(cmd *cobra.Command, args []string) {
+			protect, err := cmd.Flags().GetBool("protect")
+			handleError(err)
+			cleanCmd, err := NewCleanCmd()
+			handleError(err)
+			handleError(cleanCmd.clean(protect))
+		},
+	}
+	cleanCmd.Flags().BoolP("protect", "p", true, "protect running tpc")
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(psCmd)
+	rootCmd.AddCommand(cleanCmd)
 	err := rootCmd.Execute()
 	handleError(err)
 }
