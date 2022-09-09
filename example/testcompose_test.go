@@ -13,7 +13,7 @@ func TestTestCompose(t *testing.T) {
 	if err != nil {
 		return
 	}
-	compose, err := testcompose.NewTestCompose(filepath.Join(getwd, "./pod"), "")
+	compose, err := testcompose.NewTestCompose(filepath.Join(getwd, "./pod"))
 	if err != nil {
 		panic(err)
 	}

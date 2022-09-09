@@ -2,8 +2,7 @@ FROM golang:1.18-alpine as builder
 WORKDIR /app
 COPY . .
 RUN go mod tidy \
-    && cd agent\
-    && CGO_ENABLED=0 GOOS=linux go build -o agent
+    && CGO_ENABLED=0 go build -o agent ./cmd/agent
 
 FROM alpine
 WORKDIR /app

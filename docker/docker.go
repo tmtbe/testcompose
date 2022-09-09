@@ -32,12 +32,16 @@ import (
 )
 
 const (
-	Bridge            = "bridge"        // Bridge network name (as well as driver)
-	DefaultNetwork    = "default_agent" // Default network name when bridge is not available
-	Host              = "DOCKER_HOST"
-	PodContainerLabel = "PodContainer"
-	ComposeSessionID  = "ComposeSessionID"
-	IsCleaner         = "cleaner"
+	Bridge              = "bridge"        // Bridge network name (as well as driver)
+	DefaultNetwork      = "default_agent" // Default network name when bridge is not available
+	Host                = "DOCKER_HOST"
+	PodContainerLabel   = "PodContainer"
+	ComposeSessionID    = "ComposeSessionID"
+	AgentType           = "AgentType"
+	AgentTypeCleaner    = "cleaner"
+	AgentTypeServer     = "server"
+	AgentTypeVolume     = "volume"
+	AgentTypeSwitchData = "switchData"
 )
 
 var (
@@ -323,14 +327,14 @@ func (p *DockerProvider) daemonHost(ctx context.Context) (string, error) {
 	}
 
 	// infer from Docker host
-	url, err := url.Parse(p.client.DaemonHost())
+	urlParse, err := url.Parse(p.client.DaemonHost())
 	if err != nil {
 		return "", err
 	}
 
-	switch url.Scheme {
+	switch urlParse.Scheme {
 	case "http", "https", "tcp":
-		p.hostCache = url.Hostname()
+		p.hostCache = urlParse.Hostname()
 	case "unix", "npipe":
 		if inAContainer() {
 			ip, err := p.GetGatewayIP(ctx)
@@ -476,7 +480,7 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 	if err == nil {
 		for _, c := range containerList {
 			if c.Labels[ComposeSessionID] == sessionId {
-				if c.Labels[IsCleaner] == "true" {
+				if c.Labels[AgentType] == AgentTypeCleaner {
 					continue
 				}
 				zap.L().Sugar().Infof("remove container:%s", c.ID)
@@ -525,6 +529,22 @@ func (p *DockerProvider) RemoveContainer(ctx context.Context, id string) error {
 	return p.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
 		Force: true,
 	})
+}
+
+func (p *DockerProvider) FindAllPodContainers(ctx context.Context) ([]types.Container, error) {
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
+	fj, _ := filters.FromJSON(filtersJSON)
+	list, err := p.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: fj,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]types.Container, 0)
+	for _, c := range list {
+		result = append(result, c)
+	}
+	return result, nil
 }
 
 func (p *DockerProvider) FindContainers(ctx context.Context, sessionId string) ([]types.Container, error) {
