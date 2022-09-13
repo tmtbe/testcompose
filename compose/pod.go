@@ -62,8 +62,9 @@ func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]
 	var wg sync.WaitGroup
 	for _, pod := range pods {
 		wg.Add(1)
+		_pod := pod
 		go func() {
-			err := p.createPod(ctx, pod)
+			err := p.createPod(ctx, _pod)
 			wg.Done()
 			if err != nil {
 				errorChannel <- err

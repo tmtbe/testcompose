@@ -31,16 +31,18 @@ import (
 )
 
 const (
-	Bridge              = "bridge"        // Bridge network name (as well as driver)
-	DefaultNetwork      = "default_agent" // Default network name when bridge is not available
-	Host                = "DOCKER_HOST"
-	PodContainerLabel   = "PodContainer"
-	ComposeSessionID    = "ComposeSessionID"
-	AgentType           = "AgentType"
-	AgentTypeCleaner    = "cleaner"
-	AgentTypeServer     = "server"
-	AgentTypeVolume     = "volume"
-	AgentTypeSwitchData = "switchData"
+	Bridge                 = "bridge"        // Bridge network name (as well as driver)
+	DefaultNetwork         = "default_agent" // Default network name when bridge is not available
+	Host                   = "DOCKER_HOST"
+	PodContainerLabel      = "PodContainer"
+	ComposeSessionID       = "ComposeSessionID"
+	AgentType              = "AgentType"
+	AgentTypeCleaner       = "cleaner"
+	AgentTypeServer        = "server"
+	AgentTypeVolume        = "volume"
+	AgentTypeIngressVolume = "ingressVolume"
+	AgentTypeIngress       = "ingress"
+	AgentTypeSwitchData    = "switchData"
 )
 
 var (
@@ -587,6 +589,22 @@ func (p *DockerProvider) FindAllNetworks(ctx context.Context) ([]types.NetworkRe
 		return nil, err
 	}
 	return networks, nil
+}
+
+func (p *DockerProvider) FindContainerByName(ctx context.Context, name string) (*types.Container, error) {
+	filtersJSON := fmt.Sprintf(`{"name":"%s"}`, name)
+	fj, _ := filters.FromJSON(filtersJSON)
+	list, err := p.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: fj,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, errors.Errorf("not found container name is %s", name)
+	} else {
+		return &list[0], nil
+	}
 }
 
 func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) {

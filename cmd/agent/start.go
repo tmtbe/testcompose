@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v2"
 	"net/http"
 	"os"
 	"path/filepath"
+	"podcompose/cmd/agent/ingress"
 	"podcompose/cmd/agent/server"
 	"podcompose/common"
 	"podcompose/compose"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -108,4 +112,32 @@ func (s *Starter) switchData(selectData map[string]string) error {
 		}
 		return s.agent.StartAgentForSetVolume(ctx, selectData)
 	})
+}
+
+func (s *Starter) prepareIngressVolume(servicePortMap map[string]string) error {
+	config := ingress.NewEnvoyConfig()
+	for serviceName, portMapping := range servicePortMap {
+		portMappingSplit := strings.SplitN(portMapping, ":", 2)
+		sourcePort, err := strconv.Atoi(portMappingSplit[0])
+		if err != nil {
+			return err
+		}
+		targetPort, err := strconv.Atoi(portMappingSplit[1])
+		if err != nil {
+			return err
+		}
+		err = config.AddExposePort(serviceName, sourcePort, targetPort)
+		if err != nil {
+			return err
+		}
+	}
+	marshal, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(filepath.Join(common.AgentVolumePath, common.IngressVolumeName, "envoy.yaml"), marshal, 0766)
+	if err != nil {
+		return err
+	}
+	return nil
 }

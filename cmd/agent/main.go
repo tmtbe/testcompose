@@ -78,11 +78,27 @@ func main() {
 		},
 	}
 	switchCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
+	prepareIngressVolumeCmd := &cobra.Command{
+		Use: "prepareIngressVolume",
+		Run: func(cmd *cobra.Command, args []string) {
+			servicePorts, err := cmd.Flags().GetStringArray("ports")
+			handleError(err)
+			servicePortMap := make(map[string]string)
+			for _, servicePort := range servicePorts {
+				servicePortSplit := strings.Split(servicePort, "=")
+				servicePortMap[servicePortSplit[0]] = servicePortSplit[1]
+			}
+			err = runner.prepareIngressVolume(servicePortMap)
+			handleError(err)
+		},
+	}
+	prepareIngressVolumeCmd.Flags().StringArrayP("ports", "p", []string{}, "service port mapping")
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(restartCmd)
 	rootCmd.AddCommand(switchCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(prepareVolumeDataCmd)
+	rootCmd.AddCommand(prepareIngressVolumeCmd)
 	err = rootCmd.Execute()
 	handleError(err)
 }

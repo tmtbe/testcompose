@@ -1,22 +1,35 @@
 version: 1
-network: test
 volumes:
-  - name: workdir
+  - name: tmp
+    emptyDir: {}
+  - name: wlp-output
     emptyDir: {}
 pods:
-  - name: pod1
+  - name: nginx
     containers:
       - name: nginx
-        image: nginx
-        volumeMounts:
-          - name: workdir
-            mountPath: "/work-dir"
-  - name: pod2
+        image: nginx:latest
+  - name: ratings
+    containers:
+      - name: ratings
+        image: docker.io/istio/examples-bookinfo-ratings-v1:1.17.0
+  - name: reviews
     depends:
-      - pod1
+      - ratings
     containers:
-      - name: nginx
-        image: nginx
+      - name: reviews
+        image: docker.io/istio/examples-bookinfo-reviews-v2:1.17.0
+        env:
+          LOG_DIR: "/tmp/logs"
         volumeMounts:
-          - name: workdir
-            mountPath: "/work-dir"
+          - name: wlp-output
+            mountPath: "/opt/ibm/wlp/output"
+  - name: productpage
+    depends:
+      - reviews
+    containers:
+      - name: productpage
+        image: docker.io/istio/examples-bookinfo-productpage-v1:1.17.0
+        volumeMounts:
+          - name: tmp
+            mountPath: "/tmp"

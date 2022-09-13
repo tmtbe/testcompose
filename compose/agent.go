@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/pkg/errors"
 	"io/ioutil"
+	"path/filepath"
 	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
@@ -160,6 +161,69 @@ func (a *Agent) StartAgentForRestart(ctx context.Context, selectData []string) e
 		Mounts: agentMounts,
 		Cmd:    cmd,
 	}, AgentAutoRemove)
+}
+
+func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName string, servicePortInfo map[string]string) error {
+	agentMounts := make([]docker.ContainerMount, 0)
+	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
+	agentMounts = append(agentMounts, docker.VolumeMount(volumeName, docker.ContainerMountTarget(filepath.Join(common.AgentVolumePath, common.IngressVolumeName))))
+	cmd := make([]string, 0)
+	cmd = append(cmd, "prepareIngressVolume")
+	for serviceName, portMapping := range servicePortInfo {
+		cmd = append(cmd, "-p")
+		cmd = append(cmd, serviceName+"="+portMapping)
+	}
+	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
+		Image: common.AgentImage,
+		Name:  ContainerNamePrefix + "agent_ingress_volume" + a.composeProvider.GetSessionId(),
+		Env: map[string]string{
+			common.AgentSessionID:  a.composeProvider.GetSessionId(),
+			common.HostContextPath: a.composeProvider.GetContextPathForMount(),
+		},
+		Mounts: agentMounts,
+		Cmd:    cmd,
+		Labels: map[string]string{
+			docker.AgentType: docker.AgentTypeIngressVolume,
+		},
+	}, AgentAutoRemove)
+}
+
+func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[string]string) (docker.Container, error) {
+	volumeName := common.IngressVolumeName + "_" + a.GetSessionId()
+	containerName := ContainerNamePrefix + "agent_ingress_" + a.composeProvider.GetSessionId()
+	// first remove ingress container
+	ingressContainer, _ := a.composeProvider.GetDockerProvider().FindContainerByName(ctx, containerName)
+	if ingressContainer != nil {
+		_ = a.composeProvider.GetDockerProvider().RemoveContainer(ctx, ingressContainer.ID)
+	}
+	// then remove ingress volume
+	_ = a.composeProvider.GetDockerProvider().RemoveVolume(ctx, volumeName, true)
+	// create ingress volume
+	_, err := a.composeProvider.GetDockerProvider().CreateVolume(ctx, volumeName, a.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	// prepare volume
+	err = a.startAgentForIngressSetVolume(ctx, volumeName, servicePortInfo)
+	if err != nil {
+		return nil, err
+	}
+	// start ingress container
+	exposePorts := make([]string, 0)
+	for _, portInfo := range servicePortInfo {
+		ports := strings.SplitN(portInfo, ":", 2)
+		exposePorts = append(exposePorts, ports[1]+":"+ports[1])
+	}
+	return a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
+		Image:        common.IngressImage,
+		Name:         containerName,
+		Mounts:       docker.Mounts(docker.VolumeMount(volumeName, "/etc/envoy")),
+		ExposedPorts: exposePorts,
+		Labels: map[string]string{
+			docker.AgentType: docker.AgentTypeIngress,
+		},
+		Networks: []string{a.composeProvider.GetConfig().GetNetworkName()},
+	}, a.GetSessionId())
 }
 
 // must use waitingFor exit

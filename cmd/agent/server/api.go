@@ -88,5 +88,27 @@ func (a *Api) GetRoute() *gin.Engine {
 			"message": "restart ok",
 		})
 	})
+	router.POST(common.AgentIngressEndPoint, func(c *gin.Context) {
+		ctx := context.Background()
+		type IngressBody map[string]string
+		var ingressBody IngressBody
+		err := c.BindJSON(&ingressBody)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+		_, err = a.agent.StartAgentForIngress(ctx, ingressBody)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "set ingress ok",
+		})
+	})
 	return router
 }
