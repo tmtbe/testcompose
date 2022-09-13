@@ -547,6 +547,7 @@ func (p *DockerProvider) FindAllPodContainers(ctx context.Context) ([]types.Cont
 	fj, _ := filters.FromJSON(filtersJSON)
 	list, err := p.client.ContainerList(ctx, types.ContainerListOptions{
 		Filters: fj,
+		All:     true,
 	})
 	if err != nil {
 		return nil, err
