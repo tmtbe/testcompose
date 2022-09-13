@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
+	"podcompose/common"
 )
 
 type ComposeConfig struct {
@@ -66,9 +67,9 @@ func (v *VolumeConfig) check(contextPath string) error {
 		return errors.New("volume emptyDir hostPath cannot be null at the same time")
 	}
 	if v.SwitchData != nil {
-		_, ok := v.SwitchData["normal"]
+		_, ok := v.SwitchData[common.DefaultSwitchDataName]
 		if !ok {
-			return errors.Errorf("volume:[%s] not found \"normal\" host path", v.Name)
+			return errors.Errorf("volume:[%s] not found \"%s\" data name", v.Name, common.DefaultSwitchDataName)
 		}
 		for _, path := range v.SwitchData {
 			fileName := filepath.Join(contextPath, path)

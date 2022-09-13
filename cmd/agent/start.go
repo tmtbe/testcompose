@@ -47,7 +47,7 @@ func (s *Starter) start() error {
 	ctx := context.Background()
 	selectData := make(map[string]string)
 	for _, v := range s.compose.GetConfig().Volumes {
-		selectData[v.Name] = "normal"
+		selectData[v.Name] = common.DefaultSwitchDataName
 	}
 	err := s.compose.CreateVolumes(ctx)
 	if err != nil {

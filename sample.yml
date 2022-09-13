@@ -4,7 +4,7 @@ volumes:
   - name: { name }
     emptyDir: {}
     switchData:
-      normal: xxx
+      default: xxx
 pods:
   - name: { pod_name }
     depends:
@@ -24,8 +24,8 @@ pods:
             port: 8080
           tcpSocket:
             port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          initialDelaySeconds: 500
+          periodSeconds: 1000
         privileged: { bool }
         alwaysPullImage: { bool }
         user: { user }

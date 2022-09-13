@@ -456,7 +456,7 @@ func (p *DockerProvider) RemoveVolumes(ctx context.Context, volumeNames []string
 	}
 	for _, v := range volumeList.Volumes {
 		if _, ok := vnMap[v.Name]; ok {
-			err = p.client.VolumeRemove(ctx, v.Name, force)
+			err = p.RemoveVolume(ctx, v.Name, force)
 			if err != nil {
 				return err
 			}
@@ -466,10 +466,12 @@ func (p *DockerProvider) RemoveVolumes(ctx context.Context, volumeNames []string
 }
 
 func (p *DockerProvider) RemoveVolume(ctx context.Context, volumeID string, force bool) error {
+	zap.L().Sugar().Debugf("remove volume : %s", volumeID)
 	return p.client.VolumeRemove(ctx, volumeID, force)
 }
 
 func (p *DockerProvider) RemoveNetwork(ctx context.Context, networkID string) error {
+	zap.L().Sugar().Debugf("remove network : %s", networkID)
 	return p.client.NetworkRemove(ctx, networkID)
 }
 
@@ -534,6 +536,7 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 }
 
 func (p *DockerProvider) RemoveContainer(ctx context.Context, id string) error {
+	zap.L().Sugar().Debugf("remove container : %s", id)
 	return p.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
 		Force: true,
 	})
@@ -592,7 +595,7 @@ func (p *DockerProvider) FindAllNetworks(ctx context.Context) ([]types.NetworkRe
 }
 
 func (p *DockerProvider) FindContainerByName(ctx context.Context, name string) (*types.Container, error) {
-	filtersJSON := fmt.Sprintf(`{"name":"%s"}`, name)
+	filtersJSON := fmt.Sprintf(`{"name":{"%s":true}}`, name)
 	fj, _ := filters.FromJSON(filtersJSON)
 	list, err := p.client.ContainerList(ctx, types.ContainerListOptions{
 		Filters: fj,
