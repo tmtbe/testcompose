@@ -168,7 +168,7 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		capAdd = c.Cap.Add
 		capDrop = c.Cap.Drop
 	}
-	return p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
+	runContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
 		Name:            ContainerNamePrefix + podName + "_" + c.Name + "_" + p.sessionId,
 		Image:           c.Image,
 		Cmd:             c.Command,
@@ -185,6 +185,11 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 			PodName: podName,
 		},
 	}, p.sessionId)
+	if err != nil {
+		return nil, err
+	}
+	logName := podName + "_" + c.Name
+	return runContainer, collectLogs(&logName, runContainer)
 }
 
 func (p *PodCompose) foundContainerWithPods(ctx context.Context, pods map[string]*PodConfig) ([]types.Container, error) {

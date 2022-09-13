@@ -12,11 +12,10 @@ import (
 	"strings"
 )
 
-const AgentAutoRemove = true
-
 type Agent struct {
 	composeProvider ComposeProvider
 }
+
 type ComposeProvider interface {
 	GetContextPathForMount() string
 	GetDockerProvider() *docker.DockerProvider
@@ -57,7 +56,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context) (docker.Container, erro
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeServer,
 		},
-		AutoRemove: AgentAutoRemove,
+		AutoRemove: common.AgentAutoRemove,
 	}, a.composeProvider.GetSessionId())
 }
 
@@ -90,7 +89,7 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context, selectData map[strin
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeVolume,
 		},
-	}, AgentAutoRemove)
+	}, common.AgentAutoRemove)
 }
 
 func (a *Agent) StartAgentForClean(ctx context.Context) error {
@@ -105,8 +104,8 @@ func (a *Agent) StartAgentForClean(ctx context.Context) error {
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeCleaner,
 		},
-		AutoRemove: AgentAutoRemove, //clean must set auto remove,agent cannot remove clean container
-	}, AgentAutoRemove)
+		AutoRemove: common.AgentAutoRemove, //clean must set auto remove,agent cannot remove clean container
+	}, common.AgentAutoRemove)
 }
 
 func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[string]string) error {
@@ -138,7 +137,7 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[stri
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeSwitchData,
 		},
-	}, AgentAutoRemove)
+	}, common.AgentAutoRemove)
 }
 
 func (a *Agent) StartAgentForRestart(ctx context.Context, selectData []string) error {
@@ -160,7 +159,7 @@ func (a *Agent) StartAgentForRestart(ctx context.Context, selectData []string) e
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
-	}, AgentAutoRemove)
+	}, common.AgentAutoRemove)
 }
 
 func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName string, servicePortInfo map[string]string) error {
@@ -185,7 +184,7 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName st
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeIngressVolume,
 		},
-	}, AgentAutoRemove)
+	}, common.AgentAutoRemove)
 }
 
 func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[string]string) (docker.Container, error) {
@@ -214,7 +213,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		ports := strings.SplitN(portInfo, ":", 2)
 		exposePorts = append(exposePorts, ports[1]+":"+ports[1])
 	}
-	return a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
+	container, err := a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
 		Image:        common.IngressImage,
 		Name:         containerName,
 		Mounts:       docker.Mounts(docker.VolumeMount(volumeName, "/etc/envoy")),
@@ -224,6 +223,12 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		},
 		Networks: []string{a.composeProvider.GetConfig().GetNetworkName()},
 	}, a.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	err = collectLogs(nil, container)
+	return container, err
+
 }
 
 // must use waitingFor exit
@@ -234,6 +239,10 @@ func (a *Agent) runAndGetAgentError(ctx context.Context, containerRequest docker
 		return err
 	}
 	if err := container.Start(ctx); err != nil {
+		return err
+	}
+	err = collectLogs(nil, container)
+	if err != nil {
 		return err
 	}
 	// if auto remove, we can not get logs, so just return

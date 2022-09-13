@@ -15,3 +15,4 @@ const AgentImage = "podcompose/agent"
 const IngressImage = "envoyproxy/envoy:v1.23-latest"
 const IngressVolumeName = "ingress"
 const DefaultSwitchDataName = "default"
+const AgentAutoRemove = true

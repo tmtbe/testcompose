@@ -262,7 +262,6 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 		stopProducer:      make(chan bool),
 		logger:            Logger,
 	}
-
 	return c, nil
 }
 
