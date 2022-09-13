@@ -21,10 +21,10 @@ func NewCleanCmd() (*CleanCmd, error) {
 		plist:          NewPlist(dockerProvider),
 	}, nil
 }
-func (c *CleanCmd) clean(protectFlag bool) error {
+func (c *CleanCmd) clean(allFlag bool) error {
 	ctx := context.Background()
 	protect := make(map[string]string)
-	if protectFlag {
+	if !allFlag {
 		ps, err := c.plist.ps(ctx)
 		if err != nil {
 			return err
