@@ -55,7 +55,18 @@ func (a *Api) GetRoute() *gin.Engine {
 			})
 			return
 		}
-		err = a.agent.StartAgentForSwitchData(ctx, switchDataBody)
+		volumeNames := make([]string, 0)
+		for volumeName := range switchDataBody {
+			volumeNames = append(volumeNames, volumeName)
+		}
+		pods := a.compose.FindPodsWhoUsedVolumes(volumeNames)
+		podNames := make([]string, len(pods))
+		for k, v := range pods {
+			podNames[k] = v.Name
+		}
+		err = a.compose.RestartPods(ctx, podNames, func() error {
+			return a.agent.StartAgentForSwitchData(ctx, switchDataBody)
+		})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),
@@ -77,7 +88,9 @@ func (a *Api) GetRoute() *gin.Engine {
 			})
 			return
 		}
-		err = a.agent.StartAgentForRestart(ctx, restartBody)
+		err = a.compose.RestartPods(ctx, restartBody, func() error {
+			return nil
+		})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"message": err.Error(),

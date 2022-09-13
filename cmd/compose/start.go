@@ -29,6 +29,14 @@ func (s *StartCmd) Start() error {
 	if err := testCompose.Start(ctx); err != nil {
 		return err
 	}
-	zap.L().Sugar().Infof("StartCmd test compose success, name is: %s", testCompose.GetSessionId())
+	port, err := testCompose.GetPort(ctx)
+	if err != nil {
+		return err
+	}
+	zap.L().Sugar().Infof("StartCmd test compose success, name is: %s, managed port is: %s", testCompose.GetSessionId(), port)
+	err = s.testCompose.ShowAgentLog(ctx)
+	if err != nil {
+		return err
+	}
 	return nil
 }

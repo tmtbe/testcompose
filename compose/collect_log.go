@@ -26,9 +26,6 @@ func collectLogs(name *string, container docker.Container) error {
 	container.FollowOutput(&AgentLog{
 		Name: *name,
 	})
-	err := container.StartLogProducer(ctx)
-	if err != nil {
-		return err
-	}
+	_ = container.StartLogProducer(ctx)
 	return nil
 }

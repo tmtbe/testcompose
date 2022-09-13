@@ -60,13 +60,6 @@ func (s *Starter) start() error {
 	return s.compose.StartPods(ctx)
 }
 
-func (s *Starter) restart(podNames []string) error {
-	ctx := context.Background()
-	return s.compose.RestartPods(ctx, podNames, func() error {
-		return nil
-	})
-}
-
 func (s *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
 	api := server.NewApi(s.compose, quit)
@@ -100,18 +93,11 @@ func (s *Starter) switchData(selectData map[string]string) error {
 	for volumeName := range selectData {
 		volumeNames = append(volumeNames, volumeName)
 	}
-	pods := s.compose.FindPodsWhoUsedVolumes(volumeNames)
-	podNames := make([]string, len(pods))
-	for k, v := range pods {
-		podNames[k] = v.Name
+	err := s.compose.RecreateVolumes(ctx, volumeNames)
+	if err != nil {
+		return err
 	}
-	return s.compose.RestartPods(ctx, podNames, func() error {
-		err := s.compose.RecreateVolumes(ctx, volumeNames)
-		if err != nil {
-			return err
-		}
-		return s.agent.StartAgentForSetVolume(ctx, selectData)
-	})
+	return s.agent.StartAgentForSetVolume(ctx, selectData)
 }
 
 func (s *Starter) prepareIngressVolume(servicePortMap map[string]string) error {

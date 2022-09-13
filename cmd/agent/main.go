@@ -53,16 +53,6 @@ func main() {
 			}
 		},
 	}
-	restartCmd := &cobra.Command{
-		Use: "restart",
-		Run: func(cmd *cobra.Command, args []string) {
-			podNames, err := cmd.Flags().GetStringArray("select")
-			if err = runner.restart(podNames); err != nil {
-				handleError(err)
-			}
-		},
-	}
-	restartCmd.Flags().StringArrayP("select", "s", []string{}, "select pod to restart")
 	switchCmd := &cobra.Command{
 		Use: "switch",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -94,7 +84,6 @@ func main() {
 	}
 	prepareIngressVolumeCmd.Flags().StringArrayP("ports", "p", []string{}, "service port mapping")
 	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(restartCmd)
 	rootCmd.AddCommand(switchCmd)
 	rootCmd.AddCommand(cleanCmd)
 	rootCmd.AddCommand(prepareVolumeDataCmd)

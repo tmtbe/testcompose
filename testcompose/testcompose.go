@@ -2,8 +2,8 @@ package testcompose
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"podcompose/common"
@@ -64,11 +64,25 @@ func (t *TestCompose) Start(ctx context.Context) error {
 	return nil
 }
 
+func (t *TestCompose) GetPort(ctx context.Context) (string, error) {
+	ports, err := t.agentContainer.Ports(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, portBindings := range ports {
+		if len(portBindings) == 0 {
+			continue
+		}
+		return portBindings[0].HostPort, nil
+	}
+	return "", errors.New("can not found managed port")
+}
+
 type AgentLogConsumer struct {
 }
 
 func (a AgentLogConsumer) Accept(log docker.Log) {
-	zap.L().Sugar().Info(string(log.Content))
+	fmt.Print(string(log.Content))
 }
 
 func (t *TestCompose) ShowAgentLog(ctx context.Context) error {

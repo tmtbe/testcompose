@@ -140,28 +140,6 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[stri
 	}, common.AgentAutoRemove)
 }
 
-func (a *Agent) StartAgentForRestart(ctx context.Context, selectData []string) error {
-	agentMounts := make([]docker.ContainerMount, 0)
-	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
-	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
-	cmd := make([]string, 0)
-	cmd = append(cmd, "restart")
-	for _, podName := range selectData {
-		cmd = append(cmd, "-s")
-		cmd = append(cmd, podName)
-	}
-	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.AgentImage,
-		Name:  ContainerNamePrefix + "agent_restart_" + a.composeProvider.GetSessionId(),
-		Env: map[string]string{
-			common.AgentSessionID:  a.composeProvider.GetSessionId(),
-			common.HostContextPath: a.composeProvider.GetContextPathForMount(),
-		},
-		Mounts: agentMounts,
-		Cmd:    cmd,
-	}, common.AgentAutoRemove)
-}
-
 func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName string, servicePortInfo map[string]string) error {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
@@ -228,7 +206,6 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 	}
 	err = collectLogs(nil, container)
 	return container, err
-
 }
 
 // must use waitingFor exit
