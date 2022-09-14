@@ -37,16 +37,16 @@ func (a *Agent) StartAgentForServer(ctx context.Context) (docker.Container, erro
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
 	return a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
-		Image:        common.AgentImage,
-		Name:         ContainerNamePrefix + "agent_" + a.composeProvider.GetSessionId(),
-		ExposedPorts: []string{common.AgentPort},
+		Image:        common.ImageAgent,
+		Name:         common.ContainerNamePrefix + "agent_" + a.composeProvider.GetSessionId(),
+		ExposedPorts: []string{common.ServerAgentPort},
 		Mounts:       agentMounts,
-		WaitingFor: wait.ForHTTP(common.AgentHealthEndPoint).
-			WithPort(common.AgentPort + "/tcp").
+		WaitingFor: wait.ForHTTP(common.EndPointAgentHealth).
+			WithPort(common.ServerAgentPort + "/tcp").
 			WithMethod("GET"),
 		Env: map[string]string{
-			common.AgentSessionID:  a.composeProvider.GetSessionId(),
-			common.HostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.LabelSessionID:     a.composeProvider.GetSessionId(),
+			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 		},
 		Networks: []string{a.composeProvider.GetDockerProvider().GetDefaultNetwork(), a.composeProvider.GetConfig().GetNetworkName()},
 		NetworkAliases: map[string][]string{
@@ -78,11 +78,11 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context, selectData map[strin
 		}
 	}
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.AgentImage,
-		Name:  ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId(),
+		Image: common.ImageAgent,
+		Name:  common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId(),
 		Env: map[string]string{
-			common.AgentSessionID:  a.composeProvider.GetSessionId(),
-			common.HostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.LabelSessionID:     a.composeProvider.GetSessionId(),
+			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -94,11 +94,11 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context, selectData map[strin
 
 func (a *Agent) StartAgentForClean(ctx context.Context) error {
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image:  common.AgentImage,
+		Image:  common.ImageAgent,
 		Mounts: docker.Mounts(docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock")),
-		Name:   ContainerNamePrefix + "agent_clean_" + a.composeProvider.GetSessionId(),
+		Name:   common.ContainerNamePrefix + "agent_clean_" + a.composeProvider.GetSessionId(),
 		Env: map[string]string{
-			common.AgentSessionID: a.composeProvider.GetSessionId(),
+			common.LabelSessionID: a.composeProvider.GetSessionId(),
 		},
 		Cmd: []string{"clean"},
 		Labels: map[string]string{
@@ -126,11 +126,11 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[stri
 		}
 	}
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.AgentImage,
-		Name:  ContainerNamePrefix + "agent_switch_" + a.composeProvider.GetSessionId(),
+		Image: common.ImageAgent,
+		Name:  common.ContainerNamePrefix + "agent_switch_" + a.composeProvider.GetSessionId(),
 		Env: map[string]string{
-			common.AgentSessionID:  a.composeProvider.GetSessionId(),
-			common.HostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.LabelSessionID:     a.composeProvider.GetSessionId(),
+			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -151,11 +151,11 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName st
 		cmd = append(cmd, serviceName+"="+portMapping)
 	}
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.AgentImage,
-		Name:  ContainerNamePrefix + "agent_ingress_volume" + a.composeProvider.GetSessionId(),
+		Image: common.ImageAgent,
+		Name:  common.ContainerNamePrefix + "agent_ingress_volume" + a.composeProvider.GetSessionId(),
 		Env: map[string]string{
-			common.AgentSessionID:  a.composeProvider.GetSessionId(),
-			common.HostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.LabelSessionID:     a.composeProvider.GetSessionId(),
+			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -167,7 +167,7 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName st
 
 func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[string]string) (docker.Container, error) {
 	volumeName := common.IngressVolumeName + "_" + a.GetSessionId()
-	containerName := ContainerNamePrefix + "agent_ingress_" + a.composeProvider.GetSessionId()
+	containerName := common.ContainerNamePrefix + "agent_ingress_" + a.composeProvider.GetSessionId()
 	// first remove ingress container
 	ingressContainer, _ := a.composeProvider.GetDockerProvider().FindContainerByName(ctx, containerName)
 	if ingressContainer != nil {
@@ -192,7 +192,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		exposePorts = append(exposePorts, ports[1]+":"+ports[1])
 	}
 	container, err := a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
-		Image:        common.IngressImage,
+		Image:        common.ImageIngress,
 		Name:         containerName,
 		Mounts:       docker.Mounts(docker.VolumeMount(volumeName, "/etc/envoy")),
 		ExposedPorts: exposePorts,
@@ -204,8 +204,8 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 	if err != nil {
 		return nil, err
 	}
-	err = collectLogs(nil, container)
-	return container, err
+	collectLogs(nil, container)
+	return container, nil
 }
 
 // must use waitingFor exit
@@ -218,10 +218,7 @@ func (a *Agent) runAndGetAgentError(ctx context.Context, containerRequest docker
 	if err := container.Start(ctx); err != nil {
 		return err
 	}
-	err = collectLogs(nil, container)
-	if err != nil {
-		return err
-	}
+	collectLogs(nil, container)
 	// if auto remove, we can not get logs, so just return
 	if containerRequest.AutoRemove {
 		return nil

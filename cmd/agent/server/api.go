@@ -29,12 +29,12 @@ func (a *Api) GetRoute() *gin.Engine {
 	router := gin.New()
 	router.Use(ginzap.Ginzap(zap.L(), time.RFC3339, true))
 	router.Use(ginzap.RecoveryWithZap(zap.L(), true))
-	router.GET(common.AgentHealthEndPoint, func(c *gin.Context) {
+	router.GET(common.EndPointAgentHealth, func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "ok",
 		})
 	})
-	router.GET(common.AgentShutdownEndPoint, func(c *gin.Context) {
+	router.GET(common.EndPointAgentShutdown, func(c *gin.Context) {
 		ctx := context.Background()
 		go func() {
 			_ = a.agent.StartAgentForClean(ctx)
@@ -44,7 +44,7 @@ func (a *Api) GetRoute() *gin.Engine {
 			"message": "shutdown",
 		})
 	})
-	router.POST(common.AgentSwitchDataEndPoint, func(c *gin.Context) {
+	router.POST(common.EndPointAgentSwitchData, func(c *gin.Context) {
 		ctx := context.Background()
 		type SwitchDataBody map[string]string
 		var switchDataBody SwitchDataBody
@@ -77,7 +77,7 @@ func (a *Api) GetRoute() *gin.Engine {
 			"message": "switch data ok",
 		})
 	})
-	router.POST(common.AgentRestartEndPoint, func(c *gin.Context) {
+	router.POST(common.EndPointAgentRestart, func(c *gin.Context) {
 		ctx := context.Background()
 		type RestartBody []string
 		var restartBody RestartBody
@@ -101,7 +101,7 @@ func (a *Api) GetRoute() *gin.Engine {
 			"message": "restart ok",
 		})
 	})
-	router.POST(common.AgentIngressEndPoint, func(c *gin.Context) {
+	router.POST(common.EndPointAgentIngress, func(c *gin.Context) {
 		ctx := context.Background()
 		type IngressBody map[string]string
 		var ingressBody IngressBody

@@ -10,8 +10,8 @@ import (
 
 func main() {
 	InitLogger()
-	sessionId := os.Getenv(common.AgentSessionID)
-	hostContextPath := os.Getenv(common.HostContextPath)
+	sessionId := os.Getenv(common.LabelSessionID)
+	hostContextPath := os.Getenv(common.EnvHostContextPath)
 	runner, err := NewStarter(common.AgentContextPath, sessionId, hostContextPath)
 	volume, err := NewVolume(common.AgentContextPath, sessionId)
 	cleaner, err := NewCleaner(sessionId)

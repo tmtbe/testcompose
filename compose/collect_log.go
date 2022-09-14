@@ -14,12 +14,12 @@ type AgentLog struct {
 func (a *AgentLog) Accept(log docker.Log) {
 	fmt.Printf("%s | %s", strings.TrimLeft(a.Name, "/"), string(log.Content))
 }
-func collectLogs(name *string, container docker.Container) error {
+func collectLogs(name *string, container docker.Container) {
 	ctx := context.Background()
 	if name == nil {
 		cname, err := container.Name(ctx)
 		if err != nil {
-			return err
+			return
 		}
 		name = &cname
 	}
@@ -27,5 +27,4 @@ func collectLogs(name *string, container docker.Container) error {
 		Name: *name,
 	})
 	_ = container.StartLogProducer(ctx)
-	return nil
 }

@@ -7,18 +7,14 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/go-connections/nat"
+	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
 	"sync"
 	"time"
 )
 
-const (
-	PauseImage          = "gcr.io/google_containers/pause:3.0"
-	InitExitTimeOut     = 60000
-	PodName             = "PDO_NAME"
-	ContainerNamePrefix = "tpc_"
-)
+const ()
 
 type PodCompose struct {
 	sessionId      string
@@ -85,16 +81,16 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	containers := make([]docker.Container, 0)
 	// create pause container
 	pauseContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
-		Name: ContainerNamePrefix + pod.Name + "_pause_" + p.sessionId,
+		Name: common.ContainerNamePrefix + pod.Name + "_pause_" + p.sessionId,
 		NetworkAliases: map[string][]string{
 			p.network: {pod.Name},
 		},
-		Image:    PauseImage,
+		Image:    common.ImagePause,
 		Networks: []string{p.dockerProvider.GetDefaultNetwork(), p.network},
 		DNS:      pod.Dns,
 		CapAdd:   []string{"NET_ADMIN", "NET_RAW"},
 		Labels: map[string]string{
-			PodName: pod.Name,
+			common.LabelPodName: pod.Name,
 		},
 		AutoRemove: true,
 	}, p.sessionId)
@@ -129,7 +125,7 @@ func (p *PodCompose) createWaitingFor(isInit bool, c *ContainerConfig) wait.Stra
 		waitingFor = wait.ForExit().
 			WithExitCode(&exitCode).
 			WithPollInterval(1 * time.Second).
-			WithExitTimeout(InitExitTimeOut * time.Millisecond)
+			WithExitTimeout(common.InitExitTimeOut * time.Millisecond)
 	} else {
 		if c.WaitingFor == nil {
 			return nil
@@ -169,7 +165,7 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		capDrop = c.Cap.Drop
 	}
 	runContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
-		Name:            ContainerNamePrefix + podName + "_" + c.Name + "_" + p.sessionId,
+		Name:            common.ContainerNamePrefix + podName + "_" + c.Name + "_" + p.sessionId,
 		Image:           c.Image,
 		Cmd:             c.Command,
 		Privileged:      c.Privileged,
@@ -182,14 +178,15 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		Env:             c.Env,
 		WaitingFor:      p.createWaitingFor(isInit, c),
 		Labels: map[string]string{
-			PodName: podName,
+			common.LabelPodName: podName,
 		},
 	}, p.sessionId)
 	if err != nil {
 		return nil, err
 	}
 	logName := podName + "_" + c.Name
-	return runContainer, collectLogs(&logName, runContainer)
+	collectLogs(&logName, runContainer)
+	return runContainer, nil
 }
 
 func (p *PodCompose) foundContainerWithPods(ctx context.Context, pods map[string]*PodConfig) ([]types.Container, error) {
@@ -199,7 +196,7 @@ func (p *PodCompose) foundContainerWithPods(ctx context.Context, pods map[string
 	}
 	result := make([]types.Container, 0)
 	for _, c := range containers {
-		if _, ok := pods[c.Labels[PodName]]; ok {
+		if _, ok := pods[c.Labels[common.LabelPodName]]; ok {
 			result = append(result, c)
 		}
 	}

@@ -64,7 +64,7 @@ func (s *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
 	api := server.NewApi(s.compose, quit)
 	srv := &http.Server{
-		Addr:    ":" + common.AgentPort,
+		Addr:    ":" + common.ServerAgentPort,
 		Handler: api.GetRoute(),
 	}
 	go func() {
