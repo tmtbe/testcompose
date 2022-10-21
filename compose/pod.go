@@ -10,11 +10,10 @@ import (
 	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
+	"podcompose/event"
 	"sync"
 	"time"
 )
-
-const ()
 
 type PodCompose struct {
 	sessionId      string
@@ -22,6 +21,7 @@ type PodCompose struct {
 	network        string
 	dockerProvider *docker.DockerProvider
 	pods           map[string]*PodConfig
+	observe        *Observe
 }
 
 func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerProvider *docker.DockerProvider) (*PodCompose, error) {
@@ -32,26 +32,29 @@ func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerPr
 	if floors, err := BuildDependFloors(pods); err != nil {
 		return nil, err
 	} else {
+		observe := &Observe{}
+		observe.Start(dockerProvider)
 		return &PodCompose{
 			orderPods:      floors.GetStartOrder(),
 			network:        network,
 			dockerProvider: dockerProvider,
 			sessionId:      sessionID,
 			pods:           podMap,
+			observe:        observe,
 		}, nil
 	}
 }
 
 func (p *PodCompose) start(ctx context.Context) error {
 	for _, pods := range p.orderPods {
-		if err := p.concurrencyCreatePods(ctx, pods); err != nil {
+		if err := p.concurrencyCreatePods(ctx, pods, p.observe); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]*PodConfig) error {
+func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]*PodConfig, observe *Observe) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errorChannel := make(chan error, len(pods))
@@ -60,7 +63,7 @@ func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]
 		wg.Add(1)
 		_pod := pod
 		go func() {
-			err := p.createPod(ctx, _pod)
+			err := p.createPod(ctx, _pod, observe)
 			wg.Done()
 			if err != nil {
 				errorChannel <- err
@@ -77,7 +80,12 @@ func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]
 	}
 }
 
-func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
+func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig, observe *Observe) error {
+	ctx = event.PrepareTracingData(ctx, event.TracingData{PodName: pod.Name})
+	event.Publish(ctx, event.Pod, &event.PodEventData{
+		Type: event.PodEventStartType,
+		Name: pod.Name,
+	})
 	containers := make([]docker.Container, 0)
 	// create pause container
 	pauseContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
@@ -115,6 +123,13 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		}
 		containers = append(containers, createContainer)
 	}
+	for _, c := range containers {
+		p.observe.observeContainerId(c.GetContainerID())
+	}
+	event.Publish(ctx, event.Pod, &event.PodEventData{
+		Type: event.PodEventReadyType,
+		Name: pod.Name,
+	})
 	return nil
 }
 
@@ -227,7 +242,7 @@ func (p *PodCompose) RestartPods(ctx context.Context, pods []string, beforeStart
 			}
 		}
 		if len(needConcurrencyCreatePods) > 0 {
-			err := p.concurrencyCreatePods(ctx, needConcurrencyCreatePods)
+			err := p.concurrencyCreatePods(ctx, needConcurrencyCreatePods, p.observe)
 			if err != nil {
 				return err
 			}

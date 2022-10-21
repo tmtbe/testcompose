@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"podcompose/docker/wait"
+	"podcompose/event"
 	"strings"
 	"time"
 )
@@ -262,6 +263,12 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 		stopProducer:      make(chan bool),
 		logger:            Logger,
 	}
+	event.Publish(ctx, event.Container, &event.ContainerEventData{
+		Type:  event.ContainerEventCreatedType,
+		Id:    c.ID,
+		Name:  req.Name,
+		Image: req.Image,
+	})
 	return c, nil
 }
 
@@ -306,7 +313,7 @@ func (p *DockerProvider) RunContainer(ctx context.Context, req ContainerRequest,
 	if err != nil {
 		return nil, err
 	}
-
+	ctx = event.PrepareTracingData(ctx, event.TracingData{ContainerName: req.Name})
 	if err := c.Start(ctx); err != nil {
 		return c, fmt.Errorf("%w: could not start container", err)
 	}
@@ -610,6 +617,17 @@ func (p *DockerProvider) FindContainerByName(ctx context.Context, name string) (
 	}
 }
 
+func (p *DockerProvider) State(ctx context.Context, id string) (*types.ContainerState, error) {
+	inspect, err := p.client.ContainerInspect(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err != nil {
+		return inspect.State, err
+	}
+	return inspect.State, nil
+}
+
 func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) {
 	// Get list of available networks
 	networkResources, err := cli.NetworkList(ctx, types.NetworkListOptions{})
@@ -802,6 +820,10 @@ func (c *DockerContainer) SessionID() string {
 
 // Start will start an already created container
 func (c *DockerContainer) Start(ctx context.Context) error {
+	event.Publish(ctx, event.Container, &event.ContainerEventData{
+		Type: event.ContainerEventStartType,
+		Id:   c.ID,
+	})
 	shortID := c.ID[:12]
 	c.logger.Printf("Starting container id: %s image: %s", shortID, c.Image)
 
@@ -817,7 +839,11 @@ func (c *DockerContainer) Start(ctx context.Context) error {
 		}
 	}
 	c.logger.Printf("Container is ready id: %s image: %s", shortID, c.Image)
-
+	event.Publish(ctx, event.Container, &event.ContainerEventData{
+		Type:  event.ContainerEventReadyType,
+		Id:    c.ID,
+		Image: c.Image,
+	})
 	return nil
 }
 
