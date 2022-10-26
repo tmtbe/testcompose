@@ -2,6 +2,7 @@ package compose
 
 import (
 	"context"
+	"go.uber.org/zap"
 	"podcompose/docker"
 	"podcompose/event"
 	"time"
@@ -14,6 +15,7 @@ type Observe struct {
 func (o *Observe) Start(provider *docker.DockerProvider) {
 	o.ids = make(map[string]string)
 	go func() {
+		zap.L().Debug("Start observe")
 		ctx := context.Background()
 		for true {
 			for index, id := range o.ids {

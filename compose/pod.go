@@ -32,20 +32,20 @@ func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerPr
 	if floors, err := BuildDependFloors(pods); err != nil {
 		return nil, err
 	} else {
-		observe := &Observe{}
-		observe.Start(dockerProvider)
 		return &PodCompose{
 			orderPods:      floors.GetStartOrder(),
 			network:        network,
 			dockerProvider: dockerProvider,
 			sessionId:      sessionID,
 			pods:           podMap,
-			observe:        observe,
+			observe:        nil,
 		}, nil
 	}
 }
 
 func (p *PodCompose) start(ctx context.Context) error {
+	p.observe = &Observe{}
+	p.observe.Start(p.dockerProvider)
 	for _, pods := range p.orderPods {
 		if err := p.concurrencyCreatePods(ctx, pods, p.observe); err != nil {
 			return err
