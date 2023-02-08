@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"os"
+	"podcompose/common"
 	_ "podcompose/event"
 )
 
@@ -15,6 +16,13 @@ func main() {
 	startCmd := &cobra.Command{
 		Use: "start",
 		Run: func(cmd *cobra.Command, args []string) {
+			debug, err := cmd.Flags().GetBool("debug")
+			if err != nil {
+				handleError(err)
+			}
+			if debug {
+				common.AgentAutoRemove = false
+			}
 			contextPath, err := cmd.Flags().GetString("path")
 			handleError(err)
 			name, err := cmd.Flags().GetString("name")
@@ -24,6 +32,7 @@ func main() {
 		},
 	}
 	wdPath, _ := os.Getwd()
+	startCmd.Flags().Bool("debug", false, "debug mode")
 	startCmd.Flags().StringP("path", "p", wdPath, "context path, normal is $PWD")
 	startCmd.Flags().StringP("name", "n", "", "set the test compose name, normal is uuid")
 	stopCmd := &cobra.Command{

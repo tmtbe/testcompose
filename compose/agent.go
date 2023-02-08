@@ -39,7 +39,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context) (docker.Container, erro
 	return a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
 		Image:        common.ImageAgent,
 		Name:         common.ContainerNamePrefix + "agent_" + a.composeProvider.GetSessionId(),
-		ExposedPorts: []string{common.ServerAgentPort},
+		ExposedPorts: []string{common.ServerAgentPort, common.ServerAgentEventBusPort},
 		Mounts:       agentMounts,
 		WaitingFor: wait.ForHTTP(common.EndPointAgentHealth).
 			WithPort(common.ServerAgentPort + "/tcp").
@@ -139,7 +139,6 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[stri
 		},
 	}, common.AgentAutoRemove)
 }
-
 func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName string, servicePortInfo map[string]string) error {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
@@ -204,7 +203,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 	if err != nil {
 		return nil, err
 	}
-	collectLogs(nil, container)
+	collectLogs(&containerName, container)
 	return container, nil
 }
 
@@ -215,10 +214,10 @@ func (a *Agent) runAndGetAgentError(ctx context.Context, containerRequest docker
 	if err != nil {
 		return err
 	}
+	collectLogs(&containerRequest.Name, container)
 	if err := container.Start(ctx); err != nil {
 		return err
 	}
-	collectLogs(nil, container)
 	// if auto remove, we can not get logs, so just return
 	if containerRequest.AutoRemove {
 		return nil

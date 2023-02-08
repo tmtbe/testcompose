@@ -117,6 +117,10 @@ func ForHTTP(path string) *HTTPStrategy {
 
 // WaitUntilReady implements Strategy.WaitUntilReady
 func (ws *HTTPStrategy) WaitUntilReady(ctx context.Context, target StrategyTarget) (err error) {
+	err = IsExited(ctx, target)
+	if err != nil {
+		return err
+	}
 	// limit context to startupTimeout
 	ctx, cancelContext := context.WithTimeout(ctx, ws.startupTimeout)
 	defer cancelContext()
@@ -200,6 +204,10 @@ func (ws *HTTPStrategy) WaitUntilReady(ctx context.Context, target StrategyTarge
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(ws.PollInterval):
+			err = IsExited(ctx, target)
+			if err != nil {
+				return err
+			}
 			req, err := http.NewRequestWithContext(ctx, ws.Method, endpoint, bytes.NewReader(body))
 			if err != nil {
 				return err

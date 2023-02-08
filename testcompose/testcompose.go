@@ -3,6 +3,7 @@ package testcompose
 import (
 	"context"
 	"fmt"
+	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
@@ -64,16 +65,19 @@ func (t *TestCompose) Start(ctx context.Context) error {
 	return nil
 }
 
-func (t *TestCompose) GetPort(ctx context.Context) (string, error) {
+func (t *TestCompose) GetPort(ctx context.Context, portName string) (string, error) {
 	ports, err := t.agentContainer.Ports(ctx)
 	if err != nil {
 		return "", err
 	}
-	for _, portBindings := range ports {
-		if len(portBindings) == 0 {
-			continue
+	natPort, _ := nat.NewPort("tcp", portName)
+	for port, portBindings := range ports {
+		if port == natPort {
+			if len(portBindings) == 0 {
+				break
+			}
+			return portBindings[0].HostPort, nil
 		}
-		return portBindings[0].HostPort, nil
 	}
 	return "", errors.New("can not found managed port")
 }

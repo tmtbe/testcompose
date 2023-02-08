@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"podcompose/common"
+	"podcompose/event"
 	"strings"
 )
 
@@ -43,6 +44,10 @@ func main() {
 	startCmd := &cobra.Command{
 		Use: "start",
 		Run: func(cmd *cobra.Command, args []string) {
+			err = event.StartEventBusServer()
+			if err != nil {
+				handleError(err)
+			}
 			go func() {
 				if err = runner.start(); err != nil {
 					handleError(err)

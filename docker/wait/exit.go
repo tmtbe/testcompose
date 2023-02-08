@@ -2,6 +2,7 @@ package wait
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ func NewExitStrategy() *ExitStrategy {
 	}
 
 }
+
 func (ws *ExitStrategy) WithExitCode(code *int) *ExitStrategy {
 	ws.Code = code
 	return ws
@@ -57,6 +59,21 @@ func (ws *ExitStrategy) WithPollInterval(pollInterval time.Duration) *ExitStrate
 //     WithPollInterval(1 * time.Second)
 func ForExit() *ExitStrategy {
 	return NewExitStrategy()
+}
+
+func IsExited(ctx context.Context, target StrategyTarget) error {
+	state, err := target.State(ctx)
+	if err != nil {
+		if !strings.Contains(err.Error(), "No such container") {
+			return err
+		} else {
+			return nil
+		}
+	}
+	if !state.Running {
+		return errors.New(fmt.Sprintf("container id :%s is exited", target.GetContainerID()[:12]))
+	}
+	return nil
 }
 
 // WaitUntilReady implements Strategy.WaitUntilReady

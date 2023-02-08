@@ -833,7 +833,7 @@ func (c *DockerContainer) Start(ctx context.Context) error {
 
 	// if a Wait Strategy has been specified, wait before returning
 	if c.WaitingFor != nil {
-		c.logger.Printf("Waiting for container id %s image: %s", shortID, c.Image)
+		c.logger.Printf("Waiting for container id: %s image: %s", shortID, c.Image)
 		if err := c.WaitingFor.WaitUntilReady(ctx, c); err != nil {
 			return err
 		}

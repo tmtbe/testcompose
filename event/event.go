@@ -4,13 +4,16 @@ import (
 	"github.com/asaskevich/EventBus"
 	"github.com/docker/docker/api/types"
 	"golang.org/x/net/context"
+	"podcompose/common"
 	"time"
 )
 
 var Bus EventBus.Bus
 
-func init() {
-	Bus = EventBus.New()
+func StartEventBusServer() error {
+	server := EventBus.NewServer(":"+common.ServerAgentEventBusPort, common.ServerAgentEventBusPath, EventBus.New())
+	Bus = server.EventBus()
+	return server.Start()
 }
 
 const Pod string = "pod"
@@ -48,6 +51,9 @@ func PrepareTracingData(ctx context.Context, tracingData TracingData) context.Co
 }
 
 func Publish(ctx context.Context, topic string, event Event) {
+	if Bus == nil {
+		return
+	}
 	data, ok := ctx.Value("eventTracingData").(TracingData)
 	if ok {
 		event.MergeTracingData(data)

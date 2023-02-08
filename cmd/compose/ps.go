@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/docker/go-connections/nat"
 	"github.com/gosuri/uitable"
+	"podcompose/common"
 	"podcompose/docker"
 )
 
@@ -30,9 +32,10 @@ func NewPlistCmd() (*PlistCmd, error) {
 }
 
 type PlistStruct struct {
-	Name  string
-	Alive bool
-	Port  string
+	Name         string
+	Alive        bool
+	AgentPort    string
+	EventBusPort string
 }
 
 func (p *Plist) ps(ctx context.Context) (map[string]PlistStruct, error) {
@@ -47,25 +50,30 @@ func (p *Plist) ps(ctx context.Context) (map[string]PlistStruct, error) {
 			if c.State == "running" {
 				alive = true
 			}
-			port := p.getPort(ctx, docker.NewDockerContainer(c.ID, c.Image, p.dockerProvider, c.Labels[docker.ComposeSessionID], nil))
+			agentPort := p.getPort(ctx, docker.NewDockerContainer(c.ID, c.Image, p.dockerProvider, c.Labels[docker.ComposeSessionID], nil), common.ServerAgentPort)
+			eventBusPort := p.getPort(ctx, docker.NewDockerContainer(c.ID, c.Image, p.dockerProvider, c.Labels[docker.ComposeSessionID], nil), common.ServerAgentPort)
 			plists[c.Labels[docker.ComposeSessionID]] = PlistStruct{
-				Name:  c.Labels[docker.ComposeSessionID],
-				Alive: alive,
-				Port:  port,
+				Name:         c.Labels[docker.ComposeSessionID],
+				Alive:        alive,
+				AgentPort:    agentPort,
+				EventBusPort: eventBusPort,
 			}
 		}
 	}
 	return plists, nil
 }
 
-func (p *Plist) getPort(ctx context.Context, container *docker.DockerContainer) string {
+func (p *Plist) getPort(ctx context.Context, container *docker.DockerContainer, portName string) string {
 	ports, err := container.Ports(ctx)
 	if err != nil {
 		return ""
 	}
-	for _, portBinds := range ports {
-		if len(portBinds) > 0 {
-			return portBinds[0].HostPort
+	natPort, _ := nat.NewPort("tcp", portName)
+	for port, portBinds := range ports {
+		if port == natPort {
+			if len(portBinds) > 0 {
+				return portBinds[0].HostPort
+			}
 		}
 	}
 	return ""
@@ -76,9 +84,9 @@ func (p *PlistCmd) Ps() error {
 	ps, err := p.ps(ctx)
 	table := uitable.New()
 	table.MaxColWidth = 50
-	table.AddRow("NAME", "ALIVE", "PORT")
+	table.AddRow("NAME", "ALIVE", "AGENT_PORT", "EVENT_BUS_PORT")
 	for _, p := range ps {
-		table.AddRow(p.Name, p.Alive, p.Port)
+		table.AddRow(p.Name, p.Alive, p.AgentPort, p.EventBusPort)
 	}
 	fmt.Println(table)
 	return err

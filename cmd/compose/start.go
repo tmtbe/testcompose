@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"go.uber.org/zap"
+	"podcompose/common"
 	"podcompose/testcompose"
 )
 
@@ -29,11 +30,15 @@ func (s *StartCmd) Start() error {
 	if err := testCompose.Start(ctx); err != nil {
 		return err
 	}
-	port, err := testCompose.GetPort(ctx)
+	agentPort, err := testCompose.GetPort(ctx, common.ServerAgentPort)
 	if err != nil {
 		return err
 	}
-	zap.L().Sugar().Infof("StartCmd test compose success, name is: %s, managed port is: %s", testCompose.GetSessionId(), port)
+	eventBusPort, err := testCompose.GetPort(ctx, common.ServerAgentEventBusPort)
+	if err != nil {
+		return err
+	}
+	zap.L().Sugar().Infof("StartCmd test compose success, name is: %s, managed port is: %s ,event bus port is:%s", testCompose.GetSessionId(), agentPort, eventBusPort)
 	err = s.testCompose.ShowAgentLog(ctx)
 	if err != nil {
 		return err

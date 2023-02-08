@@ -14,6 +14,7 @@ type Strategy interface {
 }
 
 type StrategyTarget interface {
+	GetContainerID() string
 	Host(context.Context) (string, error)
 	MappedPort(context.Context, nat.Port) (nat.Port, error)
 	Logs(context.Context) (io.ReadCloser, error)

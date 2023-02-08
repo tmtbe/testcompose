@@ -12,6 +12,8 @@ const EndPointAgentSwitchData = "/switch"
 const EndPointAgentRestart = "/restart"
 const EndPointAgentIngress = "/ingress"
 const ServerAgentPort = "8080"
+const ServerAgentEventBusPort = "7070"
+const ServerAgentEventBusPath = "/_server_bus_"
 
 const LabelSessionID = "SESSION_ID"
 const LabelPodName = "POD_NAME"
@@ -21,6 +23,7 @@ const ConfigFileName = "compose.yml"
 
 const IngressVolumeName = "ingress"
 const DefaultSwitchDataName = "default"
-const AgentAutoRemove = true
 const InitExitTimeOut = 60000
 const ContainerNamePrefix = "tpc_"
+
+var AgentAutoRemove = true
