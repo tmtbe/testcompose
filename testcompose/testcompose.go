@@ -64,7 +64,7 @@ func (t *TestCompose) Start(ctx context.Context) error {
 	return nil
 }
 
-func (t *TestCompose) GetPort(ctx context.Context) (string, error) {
+func (t *TestCompose) GetAgentPort(ctx context.Context) (string, error) {
 	ports, err := t.agentContainer.Ports(ctx)
 	if err != nil {
 		return "", err

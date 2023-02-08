@@ -29,7 +29,7 @@ func (s *StartCmd) Start() error {
 	if err := testCompose.Start(ctx); err != nil {
 		return err
 	}
-	port, err := testCompose.GetPort(ctx)
+	port, err := testCompose.GetAgentPort(ctx)
 	if err != nil {
 		return err
 	}
