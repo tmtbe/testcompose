@@ -15,6 +15,26 @@ import (
 type Agent struct {
 	composeProvider ComposeProvider
 }
+type Info struct {
+	SessionId   string
+	VolumeInfos []VolumeInfo
+	PodInfos    []PodInfo
+}
+type PodInfo struct {
+	Name           string
+	ContainerInfos []ContainerInfo
+}
+type ContainerInfo struct {
+	Name        string
+	ContainerId string
+	State       string
+	Image       string
+	Created     int64
+}
+type VolumeInfo struct {
+	Name     string
+	VolumeId string
+}
 
 type ComposeProvider interface {
 	GetContextPathForMount() string
@@ -31,6 +51,41 @@ func NewAgent(composeProvider ComposeProvider) *Agent {
 
 func (a *Agent) GetSessionId() string {
 	return a.composeProvider.GetSessionId()
+}
+func (a *Agent) GetInfo() Info {
+	volumeInfos := make([]VolumeInfo, len(a.composeProvider.GetConfig().Volumes))
+	for i, v := range a.composeProvider.GetConfig().Volumes {
+		volumeInfos[i] = VolumeInfo{
+			Name:     v.Name,
+			VolumeId: v.Name + "_" + genSessionId(),
+		}
+	}
+	ctx := context.Background()
+	containers, _ := a.composeProvider.GetDockerProvider().FindAllContainersWithSessionId(ctx, a.composeProvider.GetSessionId())
+	podInfos := make([]PodInfo, len(a.composeProvider.GetConfig().Pods))
+	for i, p := range a.composeProvider.GetConfig().Pods {
+		containerInfos := make([]ContainerInfo, 0)
+		for _, c := range containers {
+			if c.Labels[common.LabelPodName] == p.Name {
+				containerInfos = append(containerInfos, ContainerInfo{
+					Name:        c.Labels[common.LabelContainerName],
+					ContainerId: c.ID,
+					State:       c.State,
+					Image:       c.Image,
+					Created:     c.Created,
+				})
+			}
+		}
+		podInfos[i] = PodInfo{
+			Name:           p.Name,
+			ContainerInfos: containerInfos,
+		}
+	}
+	return Info{
+		SessionId:   genSessionId(),
+		VolumeInfos: volumeInfos,
+		PodInfos:    podInfos,
+	}
 }
 func (a *Agent) StartAgentForServer(ctx context.Context) (docker.Container, error) {
 	agentMounts := make([]docker.ContainerMount, 0)

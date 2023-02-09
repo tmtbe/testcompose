@@ -38,6 +38,6 @@ func (s *StartCmd) Start() error {
 	if err != nil {
 		return err
 	}
-	zap.L().Sugar().Infof("StartCmd test compose success, name is: %s, managed port is: %s ,event bus port is:%s", testCompose.GetSessionId(), agentPort, eventBusPort)
+	zap.L().Sugar().Infof("StartCmd test compose success, name is: %s, managed port is: %s, event bus port is:%s", testCompose.GetSessionId(), agentPort, eventBusPort)
 	return nil
 }

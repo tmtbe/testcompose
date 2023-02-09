@@ -34,7 +34,7 @@ func (a *Api) GetRoute() *gin.Engine {
 			"message": "ok",
 		})
 	})
-	router.GET(common.EndPointAgentShutdown, func(c *gin.Context) {
+	router.POST(common.EndPointAgentShutdown, func(c *gin.Context) {
 		ctx := context.Background()
 		go func() {
 			_ = a.agent.StartAgentForClean(ctx)
@@ -122,6 +122,9 @@ func (a *Api) GetRoute() *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "set ingress ok",
 		})
+	})
+	router.GET(common.EndPointAgentInfo, func(c *gin.Context) {
+		c.JSON(http.StatusOK, a.agent.GetInfo())
 	})
 	return router
 }

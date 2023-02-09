@@ -561,6 +561,19 @@ func (p *DockerProvider) FindAllPodContainers(ctx context.Context) ([]types.Cont
 	return list, nil
 }
 
+func (p *DockerProvider) FindAllContainersWithSessionId(ctx context.Context, sessionId string) ([]types.Container, error) {
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":%s}}`, ComposeSessionID, sessionId)
+	fj, _ := filters.FromJSON(filtersJSON)
+	list, err := p.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: fj,
+		All:     true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func (p *DockerProvider) FindContainers(ctx context.Context, sessionId string) ([]types.Container, error) {
 	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
 	fj, _ := filters.FromJSON(filtersJSON)
