@@ -2,9 +2,7 @@ package compose
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"path/filepath"
 	"podcompose/common"
 	"podcompose/docker"
@@ -286,31 +284,7 @@ func (a *Agent) runAndGetAgentError(ctx context.Context, containerRequest docker
 		return err
 	}
 	if state.ExitCode != 0 {
-		logs, err := container.Logs(ctx)
-		if err != nil {
-			return err
-		}
-		all, err := ioutil.ReadAll(logs)
-		if err != nil {
-			return err
-		}
-		log := string(all)
-		lines := strings.Split(log, "\n")
-		for _, line := range lines {
-			split := strings.SplitN(line, "{", 2)
-			jsonLog := "{" + split[1]
-			var logStruct struct {
-				Level string `json:"level"`
-				Msg   string `json:"msg"`
-			}
-			err := json.Unmarshal([]byte(jsonLog), &logStruct)
-			if err == nil {
-				if logStruct.Level == "error" {
-					return errors.New(logStruct.Msg)
-				}
-			}
-		}
-		return errors.New(log)
+		return errors.New("agent tool exit with error code, container id: " + container.GetContainerID())
 	}
 	return nil
 }

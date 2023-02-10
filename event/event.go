@@ -26,6 +26,7 @@ const Container string = "container"
 const ContainerEventCreatedType = "container_event_created_type"
 const ContainerEventStartType = "container_event_start_type"
 const ContainerEventReadyType = "container_event_ready_type"
+const ContainerEventRemoveType = "container_event_remove_type"
 const ContainerEventStateType = "container_event_state_type"
 
 type TracingData struct {
@@ -90,7 +91,7 @@ type ContainerEventData struct {
 	Id        string
 	Type      string
 	EventTime time.Time
-	State     types.ContainerState
+	State     *types.ContainerState
 }
 
 func (c *ContainerEventData) SetEventTime(eventTime time.Time) {

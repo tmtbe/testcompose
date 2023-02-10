@@ -110,21 +110,15 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	}
 	containers = append(containers, pauseContainer)
 	for _, c := range pod.InitContainers {
-		createContainer, req, err := p.runContainer(pod.Name, true, ctx, c, pauseContainer.GetContainerID())
-		if err := createContainer.Start(ctx, req); err != nil {
-			return err
-		}
+		createContainer, err := p.runContainer(pod.Name, true, ctx, c, pauseContainer.GetContainerID())
 		if err != nil {
 			return err
 		}
 		containers = append(containers, createContainer)
 	}
 	for _, c := range pod.Containers {
-		createContainer, req, err := p.runContainer(pod.Name, false, ctx, c, pauseContainer.GetContainerID())
+		createContainer, err := p.runContainer(pod.Name, false, ctx, c, pauseContainer.GetContainerID())
 		if err != nil {
-			return err
-		}
-		if err := createContainer.Start(ctx, req); err != nil {
 			return err
 		}
 		containers = append(containers, createContainer)
@@ -176,7 +170,7 @@ func (p *PodCompose) createWaitingFor(isInit bool, c *ContainerConfig) wait.Stra
 	return waitingFor
 }
 
-func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Context, c *ContainerConfig, pauseId string) (docker.Container, docker.ContainerRequest, error) {
+func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Context, c *ContainerConfig, pauseId string) (docker.Container, error) {
 	containerMounts := make([]docker.ContainerMount, 0)
 	for _, vm := range c.VolumeMounts {
 		containerMount := docker.VolumeMount(vm.Name+"_"+p.sessionId, docker.ContainerMountTarget(vm.MountPath))
@@ -208,9 +202,9 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 	}
 	runContainer, err := p.dockerProvider.RunContainer(ctx, req, p.sessionId)
 	if err != nil {
-		return nil, docker.ContainerRequest{}, err
+		return nil, err
 	}
-	return runContainer, req, nil
+	return runContainer, nil
 }
 
 func (p *PodCompose) foundContainerWithPods(ctx context.Context, pods map[string]*PodConfig) ([]types.Container, error) {

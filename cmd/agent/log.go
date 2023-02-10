@@ -13,5 +13,5 @@ func InitLogger() {
 	zap.ReplaceGlobals(logger)
 }
 func getEncoder() zapcore.Encoder {
-	return zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	return zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
 }

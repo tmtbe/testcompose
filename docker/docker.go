@@ -547,6 +547,19 @@ func (p *DockerProvider) ClearWithSession(ctx context.Context, sessionId string)
 
 func (p *DockerProvider) RemoveContainer(ctx context.Context, id string) error {
 	zap.L().Sugar().Debugf("remove container : %s", id)
+	inspect, err := p.ContainerInspect(ctx, id)
+	if err == nil {
+		event.Publish(ctx, &event.ContainerEventData{
+			TracingData: event.TracingData{
+				PodName:       inspect.Config.Labels[common.LabelPodName],
+				ContainerName: inspect.Config.Labels[common.LabelContainerName],
+			},
+			Type:  event.ContainerEventRemoveType,
+			Id:    inspect.ID,
+			Name:  inspect.Name,
+			Image: inspect.Image,
+		})
+	}
 	return p.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
 		Force: true,
 	})
