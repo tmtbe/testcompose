@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"go.uber.org/zap"
+	"io/ioutil"
 	"podcompose/common"
 	"podcompose/testcompose"
 )
@@ -20,7 +22,13 @@ func NewStartCmd(contextPath string, name string) *StartCmd {
 	}
 }
 
-func (s *StartCmd) Start(autoStart bool) error {
+type ConfigDump struct {
+	SessionId    string
+	ManagerPort  string
+	EventBusPort string
+}
+
+func (s *StartCmd) Start(autoStart bool, configDumpFile string) error {
 	testCompose, err := testcompose.NewTestComposeWithSessionId(s.contextPath, s.name)
 	if err != nil {
 		return err
@@ -39,5 +47,17 @@ func (s *StartCmd) Start(autoStart bool) error {
 		return err
 	}
 	zap.L().Sugar().Infof("StartCmd test compose success, name is: %s, managed port is: %s, event bus port is:%s", testCompose.GetSessionId(), agentPort, eventBusPort)
+	if configDumpFile != "" {
+		configDump := &ConfigDump{
+			SessionId:    testCompose.GetSessionId(),
+			ManagerPort:  agentPort,
+			EventBusPort: eventBusPort,
+		}
+		bytes, _ := json.Marshal(configDump)
+		err := ioutil.WriteFile(configDumpFile, bytes, 0766)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

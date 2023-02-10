@@ -27,17 +27,22 @@ func main() {
 			if err != nil {
 				handleError(err)
 			}
+			configDumpFile, err := cmd.Flags().GetString("configDumpFile")
+			if err != nil {
+				handleError(err)
+			}
 			contextPath, err := cmd.Flags().GetString("path")
 			handleError(err)
 			name, err := cmd.Flags().GetString("name")
 			handleError(err)
 			start := NewStartCmd(contextPath, name)
-			handleError(start.Start(autoStart))
+			handleError(start.Start(autoStart, configDumpFile))
 		},
 	}
 	wdPath, _ := os.Getwd()
 	startCmd.Flags().Bool("debug", false, "debug mode")
 	startCmd.Flags().Bool("autoStart", true, "auto start compose")
+	startCmd.Flags().String("configDumpFile", "", "dump config file")
 	startCmd.Flags().StringP("path", "p", wdPath, "context path, normal is $PWD")
 	startCmd.Flags().StringP("name", "n", "", "set the test compose name, normal is uuid")
 	stopCmd := &cobra.Command{
