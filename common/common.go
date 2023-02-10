@@ -1,5 +1,6 @@
 package common
 
+const TpcDebug = "TPC_DEBUG"
 const ImageAgent = "podcompose/agent"
 const ImageIngress = "envoyproxy/envoy:v1.23-latest"
 const ImagePause = "gcr.io/google_containers/pause:3.0"

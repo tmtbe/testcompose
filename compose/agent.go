@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"github.com/pkg/errors"
+	"os"
 	"path/filepath"
 	"podcompose/common"
 	"podcompose/docker"
@@ -101,6 +102,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.TpcDebug:           os.Getenv(common.TpcDebug),
 		},
 		Networks: []string{a.composeProvider.GetDockerProvider().GetDefaultNetwork(), a.composeProvider.GetConfig().GetNetworkName()},
 		NetworkAliases: map[string][]string{
@@ -137,6 +139,7 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context, selectData map[strin
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.TpcDebug:           os.Getenv(common.TpcDebug),
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -153,6 +156,7 @@ func (a *Agent) StartAgentForClean(ctx context.Context) error {
 		Name:   common.ContainerNamePrefix + "agent_clean_" + a.composeProvider.GetSessionId(),
 		Env: map[string]string{
 			common.LabelSessionID: a.composeProvider.GetSessionId(),
+			common.TpcDebug:       os.Getenv(common.TpcDebug),
 		},
 		Cmd: []string{"clean"},
 		Labels: map[string]string{
@@ -185,6 +189,7 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[stri
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.TpcDebug:           os.Getenv(common.TpcDebug),
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -209,6 +214,7 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName st
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.TpcDebug:           os.Getenv(common.TpcDebug),
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -245,9 +251,12 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		exposePorts = append(exposePorts, ports[1]+":"+ports[1])
 	}
 	container, err := a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
-		Image:        common.ImageIngress,
-		Name:         containerName,
-		Mounts:       docker.Mounts(docker.VolumeMount(volumeName, "/etc/envoy")),
+		Image:  common.ImageIngress,
+		Name:   containerName,
+		Mounts: docker.Mounts(docker.VolumeMount(volumeName, "/etc/envoy")),
+		Env: map[string]string{
+			common.TpcDebug: os.Getenv(common.TpcDebug),
+		},
 		ExposedPorts: exposePorts,
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeIngress,

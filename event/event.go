@@ -54,7 +54,7 @@ func Publish(ctx context.Context, event Event) {
 	event.SetEventTime(time.Now())
 	eventJson := event.ToJson()
 	Bus.Publish(event.Topic(), eventJson)
-	zap.L().Sugar().Info(eventJson)
+	zap.L().Sugar().Debug("event", eventJson)
 }
 
 type Event interface {

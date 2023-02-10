@@ -21,7 +21,9 @@ func main() {
 				handleError(err)
 			}
 			if debug {
+				_ = os.Setenv("TPC_DEBUG", "true")
 				common.AgentAutoRemove = false
+				InitLogger()
 			}
 			autoStart, err := cmd.Flags().GetBool("autoStart")
 			if err != nil {
