@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"go.uber.org/zap"
+	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/event"
 	"time"
@@ -19,14 +20,20 @@ func (o *Observe) Start(provider *docker.DockerProvider) {
 		ctx := context.Background()
 		for true {
 			for index, id := range o.ids {
-				state, err := provider.State(ctx, id)
+				inspect, err := provider.ContainerInspect(ctx, id)
 				if err != nil {
 					delete(o.ids, index)
 				}
-				event.Publish(ctx, event.Container, &event.ContainerEventData{
+				event.Publish(ctx, &event.ContainerEventData{
+					TracingData: event.TracingData{
+						PodName:       inspect.Config.Labels[common.LabelPodName],
+						ContainerName: inspect.Config.Labels[common.LabelContainerName],
+					},
 					Id:    id,
+					Name:  inspect.Name,
+					Image: inspect.Image,
 					Type:  event.ContainerEventStateType,
-					State: *state,
+					State: *inspect.State,
 				})
 			}
 			time.Sleep(time.Second)

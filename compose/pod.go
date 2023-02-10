@@ -81,8 +81,7 @@ func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]
 }
 
 func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
-	ctx = event.PrepareTracingData(ctx, event.TracingData{PodName: pod.Name})
-	event.Publish(ctx, event.Pod, &event.PodEventData{
+	event.Publish(ctx, &event.PodEventData{
 		Type: event.PodEventStartType,
 		Name: pod.Name,
 	})
@@ -108,18 +107,21 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	}
 	containers = append(containers, pauseContainer)
 	for _, c := range pod.InitContainers {
-		createContainer, err := p.runContainer(pod.Name, true, ctx, c, pauseContainer.GetContainerID())
+		createContainer, req, err := p.runContainer(pod.Name, true, ctx, c, pauseContainer.GetContainerID())
+		if err := createContainer.Start(ctx, req); err != nil {
+			return err
+		}
 		if err != nil {
 			return err
 		}
 		containers = append(containers, createContainer)
 	}
 	for _, c := range pod.Containers {
-		createContainer, err := p.runContainer(pod.Name, false, ctx, c, pauseContainer.GetContainerID())
+		createContainer, req, err := p.runContainer(pod.Name, false, ctx, c, pauseContainer.GetContainerID())
 		if err != nil {
 			return err
 		}
-		if err := createContainer.Start(ctx); err != nil {
+		if err := createContainer.Start(ctx, req); err != nil {
 			return err
 		}
 		containers = append(containers, createContainer)
@@ -127,7 +129,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	for _, c := range containers {
 		p.observe.observeContainerId(c.GetContainerID())
 	}
-	event.Publish(ctx, event.Pod, &event.PodEventData{
+	event.Publish(ctx, &event.PodEventData{
 		Type: event.PodEventReadyType,
 		Name: pod.Name,
 	})
@@ -168,7 +170,7 @@ func (p *PodCompose) createWaitingFor(isInit bool, c *ContainerConfig) wait.Stra
 	return waitingFor
 }
 
-func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Context, c *ContainerConfig, pauseId string) (docker.Container, error) {
+func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Context, c *ContainerConfig, pauseId string) (docker.Container, docker.ContainerRequest, error) {
 	containerMounts := make([]docker.ContainerMount, 0)
 	for _, vm := range c.VolumeMounts {
 		containerMount := docker.VolumeMount(vm.Name+"_"+p.sessionId, docker.ContainerMountTarget(vm.MountPath))
@@ -180,7 +182,7 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		capAdd = c.Cap.Add
 		capDrop = c.Cap.Drop
 	}
-	runContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
+	req := docker.ContainerRequest{
 		Name:            common.ContainerNamePrefix + podName + "_" + c.Name + "_" + p.sessionId,
 		Image:           c.Image,
 		Cmd:             c.Command,
@@ -197,13 +199,12 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 			common.LabelPodName:       podName,
 			common.LabelContainerName: c.Name,
 		},
-	}, p.sessionId)
-	if err != nil {
-		return nil, err
 	}
-	//logName := podName + "_" + c.Name
-	//collectLogs(&logName, runContainer)
-	return runContainer, nil
+	runContainer, err := p.dockerProvider.RunContainer(ctx, req, p.sessionId)
+	if err != nil {
+		return nil, docker.ContainerRequest{}, err
+	}
+	return runContainer, req, nil
 }
 
 func (p *PodCompose) foundContainerWithPods(ctx context.Context, pods map[string]*PodConfig) ([]types.Container, error) {

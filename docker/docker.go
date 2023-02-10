@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"podcompose/common"
 	"podcompose/docker/wait"
 	"podcompose/event"
 	"strings"
@@ -263,7 +264,11 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 		stopProducer:      make(chan bool),
 		logger:            Logger,
 	}
-	event.Publish(ctx, event.Container, &event.ContainerEventData{
+	event.Publish(ctx, &event.ContainerEventData{
+		TracingData: event.TracingData{
+			PodName:       req.Labels[common.LabelPodName],
+			ContainerName: req.Labels[common.LabelContainerName],
+		},
 		Type:  event.ContainerEventCreatedType,
 		Id:    c.ID,
 		Name:  req.Name,
@@ -313,8 +318,7 @@ func (p *DockerProvider) RunContainer(ctx context.Context, req ContainerRequest,
 	if err != nil {
 		return nil, err
 	}
-	ctx = event.PrepareTracingData(ctx, event.TracingData{ContainerName: req.Name})
-	if err := c.Start(ctx); err != nil {
+	if err := c.Start(ctx, req); err != nil {
 		return c, fmt.Errorf("%w: could not start container", err)
 	}
 
@@ -641,6 +645,10 @@ func (p *DockerProvider) State(ctx context.Context, id string) (*types.Container
 	return inspect.State, nil
 }
 
+func (p *DockerProvider) ContainerInspect(ctx context.Context, id string) (types.ContainerJSON, error) {
+	return p.GetClient().ContainerInspect(ctx, id)
+}
+
 func getDefaultNetwork(ctx context.Context, cli *client.Client) (string, error) {
 	// Get list of available networks
 	networkResources, err := cli.NetworkList(ctx, types.NetworkListOptions{})
@@ -832,10 +840,16 @@ func (c *DockerContainer) SessionID() string {
 }
 
 // Start will start an already created container
-func (c *DockerContainer) Start(ctx context.Context) error {
-	event.Publish(ctx, event.Container, &event.ContainerEventData{
-		Type: event.ContainerEventStartType,
-		Id:   c.ID,
+func (c *DockerContainer) Start(ctx context.Context, req ContainerRequest) error {
+	event.Publish(ctx, &event.ContainerEventData{
+		TracingData: event.TracingData{
+			PodName:       req.Labels[common.LabelPodName],
+			ContainerName: req.Labels[common.LabelContainerName],
+		},
+		Name:  req.Name,
+		Image: req.Image,
+		Type:  event.ContainerEventStartType,
+		Id:    c.ID,
 	})
 	shortID := c.ID[:12]
 	c.logger.Printf("Starting container id: %s image: %s", shortID, c.Image)
@@ -852,7 +866,12 @@ func (c *DockerContainer) Start(ctx context.Context) error {
 		}
 	}
 	c.logger.Printf("Container is ready id: %s image: %s", shortID, c.Image)
-	event.Publish(ctx, event.Container, &event.ContainerEventData{
+	event.Publish(ctx, &event.ContainerEventData{
+		TracingData: event.TracingData{
+			PodName:       req.Labels[common.LabelPodName],
+			ContainerName: req.Labels[common.LabelContainerName],
+		},
+		Name:  req.Name,
 		Type:  event.ContainerEventReadyType,
 		Id:    c.ID,
 		Image: c.Image,

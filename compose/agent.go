@@ -271,7 +271,7 @@ func (a *Agent) runAndGetAgentError(ctx context.Context, containerRequest docker
 		return err
 	}
 	collectLogs(&containerRequest.Name, container)
-	if err := container.Start(ctx); err != nil {
+	if err := container.Start(ctx, containerRequest); err != nil {
 		return err
 	}
 	// if auto remove, we can not get logs, so just return

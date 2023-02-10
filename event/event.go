@@ -1,8 +1,10 @@
 package event
 
 import (
+	"encoding/json"
 	"github.com/asaskevich/EventBus"
 	"github.com/docker/docker/api/types"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"podcompose/common"
 	"time"
@@ -40,17 +42,7 @@ func (t *TracingData) MergeTracingData(data TracingData) {
 	}
 }
 
-func PrepareTracingData(ctx context.Context, tracingData TracingData) context.Context {
-	data, ok := ctx.Value("eventTracingData").(TracingData)
-	if ok {
-		data.MergeTracingData(tracingData)
-		return context.WithValue(ctx, "eventTracingData", data)
-	} else {
-		return context.WithValue(ctx, "eventTracingData", tracingData)
-	}
-}
-
-func Publish(ctx context.Context, topic string, event Event) {
+func Publish(ctx context.Context, event Event) {
 	if Bus == nil {
 		return
 	}
@@ -59,12 +51,16 @@ func Publish(ctx context.Context, topic string, event Event) {
 		event.MergeTracingData(data)
 	}
 	event.SetEventTime(time.Now())
-	Bus.Publish(topic, event)
+	eventJson := event.ToJson()
+	Bus.Publish(event.Topic(), eventJson)
+	zap.L().Sugar().Info(eventJson)
 }
 
 type Event interface {
 	SetEventTime(eventTime time.Time)
 	MergeTracingData(tracingData TracingData)
+	ToJson() string
+	Topic() string
 }
 
 type PodEventData struct {
@@ -76,6 +72,15 @@ type PodEventData struct {
 
 func (p *PodEventData) SetEventTime(eventTime time.Time) {
 	p.EventTime = eventTime
+}
+
+func (p *PodEventData) ToJson() string {
+	jsonByte, _ := json.Marshal(p)
+	return string(jsonByte)
+}
+
+func (p *PodEventData) Topic() string {
+	return Pod
 }
 
 type ContainerEventData struct {
@@ -90,4 +95,13 @@ type ContainerEventData struct {
 
 func (c *ContainerEventData) SetEventTime(eventTime time.Time) {
 	c.EventTime = eventTime
+}
+
+func (c *ContainerEventData) ToJson() string {
+	jsonByte, _ := json.Marshal(c)
+	return string(jsonByte)
+}
+
+func (c *ContainerEventData) Topic() string {
+	return Container
 }
