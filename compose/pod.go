@@ -82,6 +82,9 @@ func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]
 
 func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	event.Publish(ctx, &event.PodEventData{
+		TracingData: event.TracingData{
+			PodName: pod.Name,
+		},
 		Type: event.PodEventStartType,
 		Name: pod.Name,
 	})
@@ -130,6 +133,9 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		p.observe.observeContainerId(c.GetContainerID())
 	}
 	event.Publish(ctx, &event.PodEventData{
+		TracingData: event.TracingData{
+			PodName: pod.Name,
+		},
 		Type: event.PodEventReadyType,
 		Name: pod.Name,
 	})
