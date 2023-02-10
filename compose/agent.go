@@ -9,6 +9,7 @@ import (
 	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
+	"strconv"
 	"strings"
 )
 
@@ -87,7 +88,7 @@ func (a *Agent) GetInfo() Info {
 		PodInfos:    podInfos,
 	}
 }
-func (a *Agent) StartAgentForServer(ctx context.Context) (docker.Container, error) {
+func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker.Container, error) {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
@@ -107,7 +108,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context) (docker.Container, erro
 		NetworkAliases: map[string][]string{
 			a.composeProvider.GetConfig().GetNetworkName(): {"agent"},
 		},
-		Cmd: []string{"start"},
+		Cmd: []string{"start", "--autoStart=" + strconv.FormatBool(autoStart)},
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeServer,
 		},

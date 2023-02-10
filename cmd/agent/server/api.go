@@ -12,20 +12,23 @@ import (
 )
 
 type Api struct {
-	agent   *compose.Agent
-	compose *compose.Compose
-	quit    chan bool
+	agent    *compose.Agent
+	compose  *compose.Compose
+	startFuc func() error
+	quit     chan bool
 }
 
-func NewApi(c *compose.Compose, quit chan bool) *Api {
+func NewApi(c *compose.Compose, quit chan bool, startFuc func() error) *Api {
 	return &Api{
-		compose: c,
-		quit:    quit,
-		agent:   compose.NewAgent(c),
+		compose:  c,
+		quit:     quit,
+		startFuc: startFuc,
+		agent:    compose.NewAgent(c),
 	}
 }
 
 func (a *Api) GetRoute() *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(ginzap.Ginzap(zap.L(), time.RFC3339, true))
 	router.Use(ginzap.RecoveryWithZap(zap.L(), true))
@@ -33,6 +36,18 @@ func (a *Api) GetRoute() *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "ok",
 		})
+	})
+	router.POST(common.EndPointAgentStart, func(c *gin.Context) {
+		err := a.startFuc()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "ok",
+			})
+		}
 	})
 	router.POST(common.EndPointAgentShutdown, func(c *gin.Context) {
 		ctx := context.Background()

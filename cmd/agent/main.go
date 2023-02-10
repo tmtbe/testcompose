@@ -48,16 +48,24 @@ func main() {
 			if err != nil {
 				handleError(err)
 			}
-			go func() {
-				if err = runner.start(); err != nil {
-					handleError(err)
-				}
-			}()
+			autoStart, err := cmd.Flags().GetBool("autoStart")
+			if err != nil {
+				handleError(err)
+			}
+			if autoStart {
+				zap.L().Info("Auto start mode is enable, start compose now")
+				go func() {
+					if err = runner.start(); err != nil {
+						handleError(err)
+					}
+				}()
+			}
 			if err = runner.startWebServer(); err != nil {
 				handleError(err)
 			}
 		},
 	}
+	startCmd.Flags().Bool("autoStart", true, "auto start compose")
 	switchCmd := &cobra.Command{
 		Use: "switch",
 		Run: func(cmd *cobra.Command, args []string) {

@@ -23,16 +23,21 @@ func main() {
 			if debug {
 				common.AgentAutoRemove = false
 			}
+			autoStart, err := cmd.Flags().GetBool("autoStart")
+			if err != nil {
+				handleError(err)
+			}
 			contextPath, err := cmd.Flags().GetString("path")
 			handleError(err)
 			name, err := cmd.Flags().GetString("name")
 			handleError(err)
 			start := NewStartCmd(contextPath, name)
-			handleError(start.Start())
+			handleError(start.Start(autoStart))
 		},
 	}
 	wdPath, _ := os.Getwd()
 	startCmd.Flags().Bool("debug", false, "debug mode")
+	startCmd.Flags().Bool("autoStart", true, "auto start compose")
 	startCmd.Flags().StringP("path", "p", wdPath, "context path, normal is $PWD")
 	startCmd.Flags().StringP("name", "n", "", "set the test compose name, normal is uuid")
 	stopCmd := &cobra.Command{

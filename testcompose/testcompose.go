@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"podcompose/common"
@@ -48,7 +49,7 @@ func (t *TestCompose) verify(ctx context.Context) error {
 	return nil
 }
 
-func (t *TestCompose) Start(ctx context.Context) error {
+func (t *TestCompose) Start(ctx context.Context, autoStart bool) error {
 	if err := t.verify(ctx); err != nil {
 		return err
 	}
@@ -57,7 +58,10 @@ func (t *TestCompose) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	agentContainer, err := t.agent.StartAgentForServer(ctx)
+	if !autoStart {
+		zap.L().Info("Auto Start is not enable, you need call agent start api to start compose")
+	}
+	agentContainer, err := t.agent.StartAgentForServer(ctx, autoStart)
 	if err != nil {
 		return err
 	}

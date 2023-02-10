@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 	"net/http"
@@ -20,6 +21,7 @@ type Starter struct {
 	compose         *compose.Compose
 	agent           *compose.Agent
 	hostContextPath string
+	isStarted       bool
 }
 
 func NewStarter(workspace string, sessionId string, hostContextPath string) (*Starter, error) {
@@ -40,10 +42,17 @@ func NewStarter(workspace string, sessionId string, hostContextPath string) (*St
 		compose:         c,
 		agent:           compose.NewAgent(c),
 		hostContextPath: hostContextPath,
+		isStarted:       false,
 	}, nil
 }
 
 func (s *Starter) start() error {
+	if s.isStarted {
+		return errors.New("compose is started")
+	}
+	defer func() {
+		s.isStarted = true
+	}()
 	ctx := context.Background()
 	selectData := make(map[string]string)
 	for _, v := range s.compose.GetConfig().Volumes {
@@ -62,7 +71,7 @@ func (s *Starter) start() error {
 
 func (s *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
-	api := server.NewApi(s.compose, quit)
+	api := server.NewApi(s.compose, quit, s.start)
 	srv := &http.Server{
 		Addr:    ":" + common.ServerAgentPort,
 		Handler: api.GetRoute(),

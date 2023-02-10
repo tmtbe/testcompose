@@ -20,14 +20,14 @@ func NewStartCmd(contextPath string, name string) *StartCmd {
 	}
 }
 
-func (s *StartCmd) Start() error {
+func (s *StartCmd) Start(autoStart bool) error {
 	testCompose, err := testcompose.NewTestComposeWithSessionId(s.contextPath, s.name)
 	if err != nil {
 		return err
 	}
 	s.testCompose = testCompose
 	ctx := context.Background()
-	if err := testCompose.Start(ctx); err != nil {
+	if err := testCompose.Start(ctx, autoStart); err != nil {
 		return err
 	}
 	agentPort, err := testCompose.GetPort(ctx, common.ServerAgentPort)

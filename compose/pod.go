@@ -201,8 +201,8 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	logName := podName + "_" + c.Name
-	collectLogs(&logName, runContainer)
+	//logName := podName + "_" + c.Name
+	//collectLogs(&logName, runContainer)
 	return runContainer, nil
 }
 

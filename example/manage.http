@@ -38,3 +38,8 @@ GET http://localhost:{{port}}/info
 
 ###
 
+# curl --location --request POST 'http://localhost:51783/start'
+POST http://localhost:{{port}}/start
+
+###
+

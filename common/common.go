@@ -6,6 +6,7 @@ const ImagePause = "gcr.io/google_containers/pause:3.0"
 
 const AgentContextPath = "/home/context/"
 const AgentVolumePath = "/home/volumes/"
+const EndPointAgentStart = "/start"
 const EndPointAgentHealth = "/heath"
 const EndPointAgentShutdown = "/shutdown"
 const EndPointAgentSwitchData = "/switch"
