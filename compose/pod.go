@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/go-connections/nat"
+	"go.uber.org/zap"
 	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
@@ -71,7 +72,6 @@ func (p *PodCompose) startSystemAop(podName string, containers []*ContainerConfi
 			common.LabelPodName:       podName,
 			common.LabelContainerName: "pause",
 		},
-		AutoRemove: common.AgentAutoRemove,
 	}, p.sessionId)
 	if err != nil {
 		return err
@@ -135,6 +135,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	})
 	containers := make([]docker.Container, 0)
 	// create pause container
+	zap.L().Sugar().Debugf("start pod: %s pause container", pod.Name)
 	pauseContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
 		Name: common.ContainerNamePrefix + pod.Name + "_pause_" + p.sessionId,
 		NetworkAliases: map[string][]string{
@@ -143,18 +144,17 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		Image:    common.ImagePause,
 		Networks: []string{p.dockerProvider.GetDefaultNetwork(), p.network},
 		DNS:      pod.Dns,
-		CapAdd:   []string{"NET_ADMIN", "NET_RAW"},
 		Labels: map[string]string{
 			common.LabelPodName:       pod.Name,
 			common.LabelContainerName: "pause",
 		},
-		AutoRemove: common.AgentAutoRemove,
 	}, p.sessionId)
 	if err != nil {
 		return err
 	}
 	containers = append(containers, pauseContainer)
 	for _, c := range pod.InitContainers {
+		zap.L().Sugar().Debugf("start pod: %s init containers: %s", pod.Name, c.Name)
 		createContainer, err := p.runContainer(pod.Name, true, ctx, c, pauseContainer.GetContainerID())
 		if err != nil {
 			return err
@@ -162,6 +162,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		containers = append(containers, createContainer)
 	}
 	for _, c := range pod.Containers {
+		zap.L().Sugar().Debugf("start pod: %s containers: %s", pod.Name, c.Name)
 		createContainer, err := p.runContainer(pod.Name, false, ctx, c, pauseContainer.GetContainerID())
 		if err != nil {
 			return err

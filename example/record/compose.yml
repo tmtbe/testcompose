@@ -28,6 +28,11 @@ pods:
         image: tmtbe/mockest-proxy:master
         command:
           - init
+        user: 0
+        cap:
+          add:
+            - NET_ADMIN
+            - NET_RAW
     containers:
       - name: app
         image: tmtbe/mockest-demo:master
@@ -41,6 +46,11 @@ pods:
         image: tmtbe/mockest-proxy:master
         command:
           - init
+        user: 0
+        cap:
+          add:
+            - NET_ADMIN
+            - NET_RAW
     containers:
       - name: app
         image: tmtbe/mockest-demo:master
