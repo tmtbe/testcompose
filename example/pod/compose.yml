@@ -4,6 +4,8 @@ volumes:
     switchData:
       default: ./switch_data_1
       data2: ./switch_data_2
+before:
+after:
 pods:
   - name: nginx
     containers:

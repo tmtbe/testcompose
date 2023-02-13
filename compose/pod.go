@@ -42,6 +42,51 @@ func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerPr
 		}, nil
 	}
 }
+func (p *PodCompose) StartSystemAopBefore(beforeContainers []*ContainerConfig, ctx context.Context) error {
+	return p.startSystemAop("system_aop_before", beforeContainers, ctx)
+}
+
+func (p *PodCompose) StartSystemAopAfter(afterContainers []*ContainerConfig, ctx context.Context) error {
+	return p.startSystemAop("system_aop_after", afterContainers, ctx)
+}
+
+func (p *PodCompose) startSystemAop(podName string, containers []*ContainerConfig, ctx context.Context) error {
+	event.Publish(ctx, &event.PodEventData{
+		TracingData: event.TracingData{
+			PodName: podName,
+		},
+		Type: event.PodEventStartType,
+		Name: podName,
+	})
+	// create pause container
+	pauseContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
+		Name: common.ContainerNamePrefix + podName + "_pause_" + p.sessionId,
+		NetworkAliases: map[string][]string{
+			p.network: {podName},
+		},
+		Image:    common.ImagePause,
+		Networks: []string{p.dockerProvider.GetDefaultNetwork(), p.network},
+		CapAdd:   []string{"NET_ADMIN", "NET_RAW"},
+		Labels: map[string]string{
+			common.LabelPodName:       podName,
+			common.LabelContainerName: "pause",
+		},
+		AutoRemove: common.AgentAutoRemove,
+	}, p.sessionId)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = pauseContainer.Terminate(context.Background())
+	}()
+	for _, c := range containers {
+		_, err := p.runContainer(podName, true, ctx, c, pauseContainer.GetContainerID())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (p *PodCompose) start(ctx context.Context) error {
 	p.observe = &Observe{}
@@ -103,7 +148,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 			common.LabelPodName:       pod.Name,
 			common.LabelContainerName: "pause",
 		},
-		AutoRemove: true,
+		AutoRemove: common.AgentAutoRemove,
 	}, p.sessionId)
 	if err != nil {
 		return err

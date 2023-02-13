@@ -15,14 +15,16 @@ type Api struct {
 	agent    *compose.Agent
 	compose  *compose.Compose
 	startFuc func() error
+	stopFuc  func() error
 	quit     chan bool
 }
 
-func NewApi(c *compose.Compose, quit chan bool, startFuc func() error) *Api {
+func NewApi(c *compose.Compose, quit chan bool, startFuc func() error, stopFuc func() error) *Api {
 	return &Api{
 		compose:  c,
 		quit:     quit,
 		startFuc: startFuc,
+		stopFuc:  stopFuc,
 		agent:    compose.NewAgent(c),
 	}
 }
@@ -46,6 +48,18 @@ func (a *Api) GetRoute() *gin.Engine {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "ok",
+			})
+		}
+	})
+	router.POST(common.EndPointAgentStop, func(c *gin.Context) {
+		err := a.stopFuc()
+		if err == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "stop success",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
 			})
 		}
 	})
@@ -83,7 +97,7 @@ func (a *Api) GetRoute() *gin.Engine {
 			return a.agent.StartAgentForSwitchData(ctx, switchDataBody)
 		})
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": err.Error(),
 			})
 			return
@@ -98,7 +112,7 @@ func (a *Api) GetRoute() *gin.Engine {
 		var restartBody RestartBody
 		err := c.BindJSON(&restartBody)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": err.Error(),
 			})
 			return
@@ -122,14 +136,14 @@ func (a *Api) GetRoute() *gin.Engine {
 		var ingressBody IngressBody
 		err := c.BindJSON(&ingressBody)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": err.Error(),
 			})
 			return
 		}
 		_, err = a.agent.StartAgentForIngress(ctx, ingressBody)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": err.Error(),
 			})
 			return

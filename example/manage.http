@@ -33,6 +33,11 @@ POST http://localhost:{{port}}/shutdown
 
 ###
 
+# curl --location --request POST 'http://localhost:51783/stop'
+POST http://localhost:{{port}}/stop
+
+###
+
 # curl --location --request GET 'http://localhost:51783/info'
 GET http://localhost:{{port}}/info
 

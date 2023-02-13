@@ -130,3 +130,17 @@ func (c *Compose) PrepareNetwork(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (c *Compose) StartSystemAopBefore(ctx context.Context) error {
+	if c.config.Before == nil {
+		return nil
+	}
+	return c.podCompose.StartSystemAopBefore(c.config.Before, ctx)
+}
+
+func (c *Compose) StartSystemAopAfter(ctx context.Context) error {
+	if c.config.After == nil {
+		return nil
+	}
+	return c.podCompose.StartSystemAopAfter(c.config.After, ctx)
+}

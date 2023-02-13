@@ -1,0 +1,50 @@
+version: 1
+volumes:
+  - name: collector
+    emptyDir: {}
+before:
+after:
+  - name: do-curl
+    image: alpine/curl
+    command:
+      - curl
+      - "demo/inbound"
+  - name: do-gen
+    image: alpine/curl
+    command:
+      - curl
+      - "collector/gen"
+pods:
+  - name: collector
+    containers:
+      - name: collector
+        image: tmtbe/mockest-collector:master
+        volumeMounts:
+          - name: collector
+            mountPath: "/home"
+  - name: demo
+    initContainers:
+      - name: proxy-init
+        image: tmtbe/mockest-proxy:master
+        command:
+          - init
+    containers:
+      - name: app
+        image: tmtbe/mockest-demo:master
+      - name: proxy
+        image: tmtbe/mockest-proxy:master
+        command:
+          - proxy
+  - name: outbound-demo
+    initContainers:
+      - name: proxy-init
+        image: tmtbe/mockest-proxy:master
+        command:
+          - init
+    containers:
+      - name: app
+        image: tmtbe/mockest-demo:master
+      - name: proxy
+        image: tmtbe/mockest-proxy:master
+        command:
+          - proxy

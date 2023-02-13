@@ -8,11 +8,13 @@ import (
 )
 
 type ComposeConfig struct {
-	Version   string          `json:"version" yaml:"version"`
-	SessionId string          `json:"sessionId" yaml:"sessionId"`
-	Network   string          `json:"network" yaml:"network"`
-	Pods      []*PodConfig    `json:"pods" yaml:"pods"`
-	Volumes   []*VolumeConfig `json:"volumes" yaml:"volumes"`
+	Version   string             `json:"version" yaml:"version"`
+	SessionId string             `json:"sessionId" yaml:"sessionId"`
+	Network   string             `json:"network" yaml:"network"`
+	Before    []*ContainerConfig `json:"before" yaml:"before"`
+	After     []*ContainerConfig `json:"after" yaml:"after"`
+	Pods      []*PodConfig       `json:"pods" yaml:"pods"`
+	Volumes   []*VolumeConfig    `json:"volumes" yaml:"volumes"`
 }
 
 func (c *ComposeConfig) GetNetworkName() string {

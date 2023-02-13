@@ -619,6 +619,16 @@ func (p *DockerProvider) FindAllVolumes(ctx context.Context) ([]*types.Volume, e
 	return volumeListOKBody.Volumes, nil
 }
 
+func (p *DockerProvider) FindAllVolumesWithSessionId(ctx context.Context, sessionId string) ([]*types.Volume, error) {
+	filtersJSON := fmt.Sprintf(`{"label":{"%s":%s}}`, ComposeSessionID, sessionId)
+	fj, _ := filters.FromJSON(filtersJSON)
+	volumeListOKBody, err := p.client.VolumeList(ctx, fj)
+	if err != nil {
+		return nil, err
+	}
+	return volumeListOKBody.Volumes, nil
+}
+
 func (p *DockerProvider) FindAllNetworks(ctx context.Context) ([]types.NetworkResource, error) {
 	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
 	fj, _ := filters.FromJSON(filtersJSON)
@@ -878,17 +888,32 @@ func (c *DockerContainer) Start(ctx context.Context, req ContainerRequest) error
 			return err
 		}
 	}
-	c.logger.Printf("Container is ready id: %s image: %s", shortID, c.Image)
-	event.Publish(ctx, &event.ContainerEventData{
-		TracingData: event.TracingData{
-			PodName:       req.Labels[common.LabelPodName],
-			ContainerName: req.Labels[common.LabelContainerName],
-		},
-		Name:  req.Name,
-		Type:  event.ContainerEventReadyType,
-		Id:    c.ID,
-		Image: c.Image,
-	})
+	state, err := c.State(ctx)
+	if err != nil || state.Running == false {
+		c.logger.Printf("Container is removed id: %s image: %s", shortID, c.Image)
+		event.Publish(ctx, &event.ContainerEventData{
+			TracingData: event.TracingData{
+				PodName:       req.Labels[common.LabelPodName],
+				ContainerName: req.Labels[common.LabelContainerName],
+			},
+			Name:  req.Name,
+			Type:  event.ContainerEventRemoveType,
+			Id:    c.ID,
+			Image: c.Image,
+		})
+	} else {
+		c.logger.Printf("Container is ready id: %s image: %s", shortID, c.Image)
+		event.Publish(ctx, &event.ContainerEventData{
+			TracingData: event.TracingData{
+				PodName:       req.Labels[common.LabelPodName],
+				ContainerName: req.Labels[common.LabelContainerName],
+			},
+			Name:  req.Name,
+			Type:  event.ContainerEventReadyType,
+			Id:    c.ID,
+			Image: c.Image,
+		})
+	}
 	return nil
 }
 

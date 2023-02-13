@@ -66,12 +66,20 @@ func (s *Starter) start() error {
 	if err != nil {
 		return err
 	}
+	err = s.compose.StartSystemAopBefore(ctx)
+	if err != nil {
+		return err
+	}
 	return s.compose.StartPods(ctx)
+}
+func (s *Starter) stop() error {
+	ctx := context.Background()
+	return s.compose.StartSystemAopAfter(ctx)
 }
 
 func (s *Starter) startWebServer() error {
 	quit := make(chan bool, 1)
-	api := server.NewApi(s.compose, quit, s.start)
+	api := server.NewApi(s.compose, quit, s.start, s.stop)
 	srv := &http.Server{
 		Addr:    ":" + common.ServerAgentPort,
 		Handler: api.GetRoute(),
