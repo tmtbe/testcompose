@@ -7,7 +7,7 @@ import (
 	"podcompose/docker"
 )
 
-type StopCmd struct {
+type ShutdownCmd struct {
 	names  []string
 	agents []*compose.Agent
 	plist  *Plist
@@ -38,7 +38,7 @@ func NewSampleCompose(sessionId string, dockerProvider *docker.DockerProvider) (
 		sessionId:      sessionId,
 	}, nil
 }
-func NewStopCmd(names []string) (*StopCmd, error) {
+func NewShutdownCmd(names []string) (*ShutdownCmd, error) {
 	dockerProvider, err := docker.NewDockerProvider()
 	if err != nil {
 		return nil, err
@@ -55,14 +55,14 @@ func NewStopCmd(names []string) (*StopCmd, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StopCmd{
+	return &ShutdownCmd{
 		names:  names,
 		agents: agents,
 		plist:  plist,
 	}, nil
 }
 
-func (s *StopCmd) Stop() error {
+func (s *ShutdownCmd) Shutdown() error {
 	ctx := context.Background()
 	ps, err := s.plist.ps(ctx)
 	if err != nil {

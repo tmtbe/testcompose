@@ -13,7 +13,7 @@ func Test_Compose(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	compose, err := NewCompose(file, sessionUUID.String(), "")
+	compose, err := NewCompose(file, sessionUUID.String(), "", "")
 	if err != nil {
 		panic(err)
 	}

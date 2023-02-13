@@ -47,12 +47,12 @@ func main() {
 	startCmd.Flags().String("configDumpFile", "", "dump config file")
 	startCmd.Flags().StringP("path", "p", wdPath, "context path, normal is $PWD")
 	startCmd.Flags().StringP("name", "n", "", "set the test compose name, normal is uuid")
-	stopCmd := &cobra.Command{
-		Use: "stop",
+	shutdownCmd := &cobra.Command{
+		Use: "shutdown",
 		Run: func(cmd *cobra.Command, args []string) {
-			stop, err := NewStopCmd(args)
+			stop, err := NewShutdownCmd(args)
 			handleError(err)
-			handleError(stop.Stop())
+			handleError(stop.Shutdown())
 		},
 	}
 	psCmd := &cobra.Command{
@@ -75,7 +75,7 @@ func main() {
 	}
 	cleanCmd.Flags().BoolP("all", "a", false, "all tpc")
 	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(stopCmd)
+	rootCmd.AddCommand(shutdownCmd)
 	rootCmd.AddCommand(psCmd)
 	rootCmd.AddCommand(cleanCmd)
 	err := rootCmd.Execute()

@@ -29,7 +29,7 @@ func Test_FindDepend(t *testing.T) {
 		},
 	}
 	convey.Convey("test depend", t, func() {
-		compose, err := NewPodCompose("", pods, "", nil)
+		compose, err := NewPodCompose("", "", pods, "", nil)
 		convey.So(err, convey.ShouldBeNil)
 		dependsPods := make(map[string]*PodConfig)
 		dependsPods = compose.findWhoDependPods([]string{"D"}, dependsPods)
@@ -67,7 +67,7 @@ func Test_findPodsWhoUsedVolumes(t *testing.T) {
 		},
 	}
 	convey.Convey("test find pods who used volumes", t, func() {
-		compose, err := NewPodCompose("", pods, "", nil)
+		compose, err := NewPodCompose("", "", pods, "", nil)
 		convey.So(err, convey.ShouldBeNil)
 		pods := compose.findPodsWhoUsedVolumes([]string{"work_dir"})
 		convey.So(len(pods), convey.ShouldEqual, 2)

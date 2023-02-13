@@ -25,7 +25,8 @@ func NewTestComposeWithSessionId(workspace string, sessionId string) (*TestCompo
 	if err != nil {
 		return nil, err
 	}
-	c, err := compose.NewCompose(configByte, sessionId, workspace)
+	hostContextPath, _ := filepath.Abs(workspace)
+	c, err := compose.NewCompose(configByte, sessionId, workspace, hostContextPath)
 	if err != nil {
 		return nil, err
 	}

@@ -23,7 +23,7 @@ func NewVolume(workspace string, sessionId string) (*Volume, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := compose.NewCompose(configByte, sessionId, workspace)
+	c, err := compose.NewCompose(configByte, sessionId, workspace, workspace)
 	if err != nil {
 		return nil, err
 	}

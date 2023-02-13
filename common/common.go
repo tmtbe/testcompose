@@ -15,7 +15,7 @@ const EndPointAgentSwitchData = "/switch"
 const EndPointAgentRestart = "/restart"
 const EndPointAgentIngress = "/ingress"
 const EndPointAgentInfo = "/info"
-const ServerAgentPort = "8080"
+const ServerAgentPort = "80"
 const ServerAgentEventBusPort = "7070"
 const ServerAgentEventBusPath = "/_server_bus_"
 

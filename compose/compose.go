@@ -19,7 +19,7 @@ type Compose struct {
 	hostContextPath string
 }
 
-func NewCompose(configBytes []byte, sessionId string, contextPath string) (*Compose, error) {
+func NewCompose(configBytes []byte, sessionId string, contextPath string, hostContextPath string) (*Compose, error) {
 	contextPath, err := filepath.Abs(contextPath)
 	if err != nil {
 		return nil, err
@@ -41,16 +41,17 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string) (*Comp
 	if err != nil {
 		return nil, err
 	}
-	compose, err := NewPodCompose(sessionId, config.Pods, config.GetNetworkName(), provider)
+	compose, err := NewPodCompose(sessionId, hostContextPath, config.Pods, config.GetNetworkName(), provider)
 	if err != nil {
 		return nil, err
 	}
 	return &Compose{
-		podCompose:     compose,
-		config:         &config,
-		dockerProvider: provider,
-		volume:         NewVolumes(config.Volumes, provider),
-		contextPath:    contextPath,
+		podCompose:      compose,
+		config:          &config,
+		dockerProvider:  provider,
+		volume:          NewVolumes(config.Volumes, provider),
+		contextPath:     contextPath,
+		hostContextPath: hostContextPath,
 	}, nil
 }
 
@@ -83,10 +84,6 @@ func (c *Compose) RestartPods(ctx context.Context, podNames []string, beforeStar
 		}
 	}
 	return c.podCompose.RestartPods(ctx, podNames, beforeStart)
-}
-
-func (c *Compose) SetHostContextPath(path string) {
-	c.hostContextPath = path
 }
 
 func (c *Compose) GetContextPathForMount() string {

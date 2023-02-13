@@ -128,11 +128,13 @@ type ContainerConfig struct {
 	Privileged      bool                 `json:"privileged" yaml:"privileged"`
 	AlwaysPullImage bool                 `json:"alwaysPullImage" yaml:"alwaysPullImage"`
 	VolumeMounts    []*VolumeMountConfig `json:"volumeMounts" yaml:"volumeMounts"`
+	BindMounts      []*BindMountConfig   `json:"bindMounts" yaml:"bindMounts"`
 	Env             map[string]string    `json:"env" yaml:"env"`
 	Command         []string             `json:"command" yaml:"command"`
 	Cap             *CapConfig           `json:"cap" yaml:"cap"`
 	WaitingFor      *WaitingForConfig    `json:"waitingFor" yaml:"waitingFor"`
-	User            string               `yaml:"user" yaml:"user"`
+	User            string               `json:"user" yaml:"user"`
+	WorkingDir      string               `json:"workingDir" yaml:"workingDir"`
 }
 
 func (cc *ContainerConfig) check(c *ComposeConfig) error {
@@ -149,6 +151,11 @@ func (cc *ContainerConfig) check(c *ComposeConfig) error {
 
 type VolumeMountConfig struct {
 	Name      string `json:"name" yaml:"name"`
+	MountPath string `json:"mountPath" yaml:"mountPath"`
+}
+
+type BindMountConfig struct {
+	HostPath  string `json:"hostPath" yaml:"hostPath"`
 	MountPath string `json:"mountPath" yaml:"mountPath"`
 }
 

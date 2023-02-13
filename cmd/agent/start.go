@@ -33,11 +33,10 @@ func NewStarter(workspace string, sessionId string, hostContextPath string) (*St
 	if err != nil {
 		return nil, err
 	}
-	c, err := compose.NewCompose(configByte, sessionId, workspace)
+	c, err := compose.NewCompose(configByte, sessionId, workspace, hostContextPath)
 	if err != nil {
 		return nil, err
 	}
-	c.SetHostContextPath(hostContextPath)
 	return &Starter{
 		compose:         c,
 		agent:           compose.NewAgent(c),

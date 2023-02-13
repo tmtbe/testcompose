@@ -32,6 +32,10 @@ pods:
         volumeMounts:
           - name: workdir
             mountPath: "/work-dir"
+        bindMounts:
+          - hostPath: "/home"
+            mountPath: "/work-dir"
+        workingDir: /home
         env:
           "xxx":"xxx"
         command:

@@ -8,24 +8,27 @@ import (
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/go-connections/nat"
 	"go.uber.org/zap"
+	"path/filepath"
 	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/docker/wait"
 	"podcompose/event"
+	"strings"
 	"sync"
 	"time"
 )
 
 type PodCompose struct {
-	sessionId      string
-	orderPods      []map[string]*PodConfig
-	network        string
-	dockerProvider *docker.DockerProvider
-	pods           map[string]*PodConfig
-	observe        *Observe
+	sessionId       string
+	orderPods       []map[string]*PodConfig
+	network         string
+	dockerProvider  *docker.DockerProvider
+	pods            map[string]*PodConfig
+	observe         *Observe
+	hostContextPath string
 }
 
-func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerProvider *docker.DockerProvider) (*PodCompose, error) {
+func NewPodCompose(sessionID string, hostContextPath string, pods []*PodConfig, network string, dockerProvider *docker.DockerProvider) (*PodCompose, error) {
 	podMap := make(map[string]*PodConfig)
 	for _, pod := range pods {
 		podMap[pod.Name] = pod
@@ -34,12 +37,13 @@ func NewPodCompose(sessionID string, pods []*PodConfig, network string, dockerPr
 		return nil, err
 	} else {
 		return &PodCompose{
-			orderPods:      floors.GetStartOrder(),
-			network:        network,
-			dockerProvider: dockerProvider,
-			sessionId:      sessionID,
-			pods:           podMap,
-			observe:        nil,
+			orderPods:       floors.GetStartOrder(),
+			network:         network,
+			dockerProvider:  dockerProvider,
+			sessionId:       sessionID,
+			pods:            podMap,
+			observe:         nil,
+			hostContextPath: hostContextPath,
 		}, nil
 	}
 }
@@ -222,6 +226,13 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		containerMount := docker.VolumeMount(vm.Name+"_"+p.sessionId, docker.ContainerMountTarget(vm.MountPath))
 		containerMounts = append(containerMounts, containerMount)
 	}
+	for _, bm := range c.BindMounts {
+		if strings.HasPrefix(bm.HostPath, ".") {
+			bm.HostPath = filepath.Join(p.hostContextPath, bm.HostPath)
+		}
+		containerMount := docker.BindMount(bm.HostPath, docker.ContainerMountTarget(bm.MountPath))
+		containerMounts = append(containerMounts, containerMount)
+	}
 	var capAdd strslice.StrSlice
 	var capDrop strslice.StrSlice
 	if c.Cap != nil {
@@ -240,6 +251,7 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		CapDrop:         capDrop,
 		User:            c.User,
 		Env:             c.Env,
+		WorkingDir:      c.WorkingDir,
 		WaitingFor:      p.createWaitingFor(isInit, c),
 		Labels: map[string]string{
 			common.LabelPodName:       podName,

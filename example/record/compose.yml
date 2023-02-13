@@ -2,7 +2,18 @@ version: 1
 volumes:
   - name: collector
     emptyDir: {}
+  - name: test
+    emptyDir: {}
 before:
+  - name: test
+    image: ubuntu
+    volumeMounts:
+      - name: test
+        mountPath: /home
+    workingDir: /home
+    command:
+      - touch
+      - before.log
 after:
   - name: do-curl
     image: alpine/curl
@@ -14,18 +25,51 @@ after:
     command:
       - curl
       - "collector/gen"
+  - name: do-copy-before
+    image: ubuntu
+    volumeMounts:
+      - name: test
+        mountPath: /home
+    bindMounts:
+      - hostPath: ./docs
+        mountPath: /docs
+    command:
+      - cp
+      - -r
+      - /home
+      - /docs
+  - name: do-copy-gen
+    image: ubuntu
+    volumeMounts:
+      - name: collector
+        mountPath: /home
+    bindMounts:
+      - hostPath: ./docs
+        mountPath: /docs
+    command:
+      - cp
+      - -r
+      - /home
+      - /docs
+  - name: do-shutdown
+    image: alpine/curl
+    command:
+      - curl
+      - --request
+      - POST
+      - "agent/shutdown"
 pods:
   - name: collector
     containers:
       - name: collector
-        image: tmtbe/mockest-collector:master
+        image: mockest/collector
         volumeMounts:
           - name: collector
             mountPath: "/home"
   - name: demo
     initContainers:
       - name: proxy-init
-        image: tmtbe/mockest-proxy:master
+        image: mockest/proxy
         command:
           - init
         user: 0
@@ -35,15 +79,15 @@ pods:
             - NET_RAW
     containers:
       - name: app
-        image: tmtbe/mockest-demo:master
+        image: mockest/demo
       - name: proxy
-        image: tmtbe/mockest-proxy:master
+        image: mockest/proxy
         command:
           - proxy
   - name: outbound-demo
     initContainers:
       - name: proxy-init
-        image: tmtbe/mockest-proxy:master
+        image: mockest/proxy
         command:
           - init
         user: 0
@@ -53,8 +97,8 @@ pods:
             - NET_RAW
     containers:
       - name: app
-        image: tmtbe/mockest-demo:master
+        image: mockest/demo
       - name: proxy
-        image: tmtbe/mockest-proxy:master
+        image: mockest/proxy
         command:
           - proxy
