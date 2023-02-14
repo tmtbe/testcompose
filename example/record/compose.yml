@@ -5,39 +5,19 @@ volumes:
   - name: test
     emptyDir: {}
 before:
-  - name: test
-    image: ubuntu
-    volumeMounts:
-      - name: test
-        mountPath: /home
-    workingDir: /home
-    command:
-      - touch
-      - before.log
 after:
   - name: do-curl
     image: alpine/curl
     command:
       - curl
       - "demo/inbound"
-  - name: do-gen
+  - name: do-import-jaeger
     image: alpine/curl
     command:
       - curl
-      - "collector/gen"
-  - name: do-copy-before
-    image: ubuntu
-    volumeMounts:
-      - name: test
-        mountPath: /home
-    bindMounts:
-      - hostPath: ./docs
-        mountPath: /docs
-    command:
-      - cp
-      - -r
-      - /home
-      - /docs
+      - --request
+      - POST
+      - "collector/import"
   - name: do-copy-gen
     image: ubuntu
     volumeMounts:
@@ -51,13 +31,13 @@ after:
       - -r
       - /home
       - /docs
-  - name: do-shutdown
-    image: alpine/curl
-    command:
-      - curl
-      - --request
-      - POST
-      - "agent/shutdown"
+#  - name: do-shutdown
+#    image: alpine/curl
+#    command:
+#      - curl
+#      - --request
+#      - POST
+#      - "agent/shutdown"
 pods:
   - name: collector
     containers:
@@ -66,6 +46,10 @@ pods:
         volumeMounts:
           - name: collector
             mountPath: "/home"
+  - name: jaeger
+    containers:
+      - name: jaeger-all
+        image: jaegertracing/all-in-one:1.42
   - name: demo
     initContainers:
       - name: proxy-init

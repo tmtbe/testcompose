@@ -14,7 +14,7 @@ Content-Type: text/plain
 POST http://localhost:{{port}}/ingress
 Content-Type: text/plain
 
-{"nginx":"80:39001"}
+{"jaeger":"16686:16686"}
 
 ###
 
