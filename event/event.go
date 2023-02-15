@@ -19,15 +19,18 @@ func StartEventBusServer() error {
 }
 
 const Pod string = "pod"
-const PodEventStartType = "pod_event_start_type"
-const PodEventReadyType = "pod_event_ready_type"
+const PodEventStartType = "start"
+const PodEventReadyType = "ready"
 
 const Container string = "container"
-const ContainerEventCreatedType = "container_event_created_type"
-const ContainerEventStartType = "container_event_start_type"
-const ContainerEventReadyType = "container_event_ready_type"
-const ContainerEventRemoveType = "container_event_remove_type"
-const ContainerEventStateType = "container_event_state_type"
+const ContainerEventPullStartType = "pull_start"
+const ContainerEventPullSuccessType = "pull_success"
+const ContainerEventPullFailType = "pull_fail"
+const ContainerEventCreatedType = "container_created"
+const ContainerEventStartType = "container_start"
+const ContainerEventReadyType = "container_ready"
+const ContainerEventRemoveType = "container_remove"
+const ContainerEventStateType = "container_state"
 
 type TracingData struct {
 	PodName       string

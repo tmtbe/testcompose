@@ -175,9 +175,41 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 			pullOpt.RegistryAuth = req.RegistryCred
 		}
 
+		event.Publish(ctx, &event.ContainerEventData{
+			TracingData: event.TracingData{
+				PodName:       req.Labels[common.LabelPodName],
+				ContainerName: req.Labels[common.LabelContainerName],
+			},
+			Type:  event.ContainerEventPullStartType,
+			Id:    "",
+			Name:  req.Name,
+			Image: req.Image,
+		})
+
 		if err := p.attemptToPullImage(ctx, tag, pullOpt); err != nil {
+			event.Publish(ctx, &event.ContainerEventData{
+				TracingData: event.TracingData{
+					PodName:       req.Labels[common.LabelPodName],
+					ContainerName: req.Labels[common.LabelContainerName],
+				},
+				Type:  event.ContainerEventPullFailType,
+				Id:    "",
+				Name:  req.Name,
+				Image: req.Image,
+			})
 			return nil, err
 		}
+
+		event.Publish(ctx, &event.ContainerEventData{
+			TracingData: event.TracingData{
+				PodName:       req.Labels[common.LabelPodName],
+				ContainerName: req.Labels[common.LabelContainerName],
+			},
+			Type:  event.ContainerEventPullSuccessType,
+			Id:    "",
+			Name:  req.Name,
+			Image: req.Image,
+		})
 	}
 
 	dockerInput := &container.Config{
