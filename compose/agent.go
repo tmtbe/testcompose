@@ -17,6 +17,7 @@ type Agent struct {
 }
 type Info struct {
 	SessionId   string
+	IsReady     bool
 	VolumeInfos []VolumeInfo
 	PodInfos    []PodInfo
 }
@@ -41,6 +42,7 @@ type ComposeProvider interface {
 	GetDockerProvider() *docker.DockerProvider
 	GetSessionId() string
 	GetConfig() *ComposeConfig
+	IsReady() bool
 }
 
 func NewAgent(composeProvider ComposeProvider) *Agent {
@@ -85,6 +87,7 @@ func (a *Agent) GetInfo() Info {
 		SessionId:   genSessionId(),
 		VolumeInfos: volumeInfos,
 		PodInfos:    podInfos,
+		IsReady:     a.composeProvider.IsReady(),
 	}
 }
 func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker.Container, error) {

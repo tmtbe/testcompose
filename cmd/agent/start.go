@@ -72,8 +72,18 @@ func (s *Starter) start() error {
 	return s.compose.StartPods(ctx)
 }
 func (s *Starter) stop() error {
-	ctx := context.Background()
-	return s.compose.StartSystemAopAfter(ctx)
+	if s.compose.IsReady() {
+		ctx := context.Background()
+		err := s.compose.StartSystemAopAfter(ctx)
+		if err != nil {
+			return err
+		}
+		s.compose.StopPods(ctx)
+		s.isStarted = false
+	} else {
+		return errors.New("compose is not ready, can not use stop command")
+	}
+	return nil
 }
 
 func (s *Starter) startWebServer() error {

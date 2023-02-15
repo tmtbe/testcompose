@@ -76,6 +76,7 @@ func (p *PodCompose) startSystemAop(podName string, containers []*ContainerConfi
 			common.LabelPodName:       podName,
 			common.LabelContainerName: "pause",
 		},
+		AutoRemove: common.AgentAutoRemove,
 	}, p.sessionId)
 	if err != nil {
 		return err

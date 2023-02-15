@@ -17,6 +17,10 @@ type SampleCompose struct {
 	sessionId      string
 }
 
+func (s SampleCompose) IsReady() bool {
+	return false
+}
+
 func (s SampleCompose) GetContextPathForMount() string {
 	panic("not need")
 }

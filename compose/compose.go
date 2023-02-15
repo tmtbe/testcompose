@@ -3,10 +3,12 @@ package compose
 import (
 	"github.com/pkg/errors"
 	"github.com/sony/sonyflake"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 	"path/filepath"
 	"podcompose/docker"
+	"podcompose/event"
 	"strconv"
 )
 
@@ -17,6 +19,7 @@ type Compose struct {
 	volume          *Volume
 	contextPath     string
 	hostContextPath string
+	ready           bool
 }
 
 func NewCompose(configBytes []byte, sessionId string, contextPath string, hostContextPath string) (*Compose, error) {
@@ -62,7 +65,25 @@ func genSessionId() string {
 }
 
 func (c *Compose) StartPods(ctx context.Context) error {
-	return c.podCompose.start(ctx)
+	eventData := event.ComposeEventData{
+		Type: event.ComposeEventStartType,
+	}
+	event.Publish(ctx, &eventData)
+	zap.L().Info("Compose start running")
+	err := c.podCompose.start(ctx)
+	if err != nil {
+		eventData = event.ComposeEventData{
+			Type: event.ComposeEventStartFailType,
+		}
+	} else {
+		c.ready = true
+		eventData = event.ComposeEventData{
+			Type: event.ComposeEventStartSuccessType,
+		}
+		zap.L().Info("Compose is ready, all pods is started")
+	}
+	event.Publish(ctx, &eventData)
+	return err
 }
 
 func (c *Compose) CreateVolumes(ctx context.Context) error {
@@ -78,12 +99,38 @@ func (c *Compose) FindPodsWhoUsedVolumes(volumeNames []string) []*PodConfig {
 }
 
 func (c *Compose) RestartPods(ctx context.Context, podNames []string, beforeStart func() error) error {
+	if !c.ready {
+		return errors.New("compose is not ready, can not restart")
+	}
 	for _, podName := range podNames {
 		if _, ok := c.podCompose.pods[podName]; !ok {
 			return errors.Errorf("pod name:%s is not exist", podName)
 		}
 	}
-	return c.podCompose.RestartPods(ctx, podNames, beforeStart)
+	eventData := event.ComposeEventData{
+		Type: event.ComposeEventRestartType,
+	}
+	event.Publish(ctx, &eventData)
+	zap.L().Info("Compose restart pods")
+	c.ready = false
+	err := c.podCompose.RestartPods(ctx, podNames, beforeStart)
+	if err == nil {
+		c.ready = true
+		eventData = event.ComposeEventData{
+			Type: event.ComposeEventRestartSuccessType,
+		}
+		zap.L().Info("Compose restart pods success")
+	} else {
+		eventData = event.ComposeEventData{
+			Type: event.ComposeEventRestartFailType,
+		}
+	}
+	event.Publish(ctx, &eventData)
+	return err
+}
+
+func (c *Compose) IsReady() bool {
+	return c.ready
 }
 
 func (c *Compose) GetContextPathForMount() string {
@@ -140,4 +187,25 @@ func (c *Compose) StartSystemAopAfter(ctx context.Context) error {
 		return nil
 	}
 	return c.podCompose.StartSystemAopAfter(c.config.After, ctx)
+}
+
+func (c *Compose) StopPods(ctx context.Context) {
+	c.ready = false
+	cs, err := c.dockerProvider.FindAllContainersWithSessionId(ctx, c.GetSessionId())
+	if err != nil {
+		return
+	}
+	for _, container := range cs {
+		if container.Labels[docker.AgentType] == docker.AgentTypeServer {
+			continue
+		}
+		_ = c.dockerProvider.RemoveContainer(ctx, container.ID)
+	}
+	vs, err := c.dockerProvider.FindAllVolumesWithSessionId(ctx, c.GetSessionId())
+	if err != nil {
+		return
+	}
+	for _, volume := range vs {
+		_ = c.dockerProvider.RemoveVolume(ctx, volume.Name, true)
+	}
 }

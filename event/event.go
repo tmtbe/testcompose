@@ -18,6 +18,14 @@ func StartEventBusServer() error {
 	return server.Start()
 }
 
+const Compose string = "compose"
+const ComposeEventStartType = "start"
+const ComposeEventStartSuccessType = "start_success"
+const ComposeEventStartFailType = "start_fail"
+const ComposeEventRestartType = "restart"
+const ComposeEventRestartSuccessType = "restart_success"
+const ComposeEventRestartFailType = "restart_fail"
+
 const Pod string = "pod"
 const PodEventStartType = "start"
 const PodEventReadyType = "ready"
@@ -108,4 +116,23 @@ func (c *ContainerEventData) ToJson() string {
 
 func (c *ContainerEventData) Topic() string {
 	return Container
+}
+
+type ComposeEventData struct {
+	TracingData
+	Type      string
+	EventTime time.Time
+}
+
+func (c *ComposeEventData) SetEventTime(eventTime time.Time) {
+	c.EventTime = eventTime
+}
+
+func (c *ComposeEventData) ToJson() string {
+	jsonByte, _ := json.Marshal(c)
+	return string(jsonByte)
+}
+
+func (c *ComposeEventData) Topic() string {
+	return Compose
 }

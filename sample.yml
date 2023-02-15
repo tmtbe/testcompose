@@ -5,6 +5,28 @@ volumes:
     emptyDir: {}
     switchData:
       default: xxx
+trigger:
+  { start }:
+    - name: { container_name }
+      privileged: { bool }
+      alwaysPullImage: { bool }
+      user: { user }
+      volumeMounts:
+        - name: workdir
+          mountPath: "/work-dir"
+      bindMounts:
+        - hostPath: "/home"
+          mountPath: "/work-dir"
+      workingDir: /home
+      env:
+        "xxx":"xxx"
+      command:
+        - { command }
+      cap:
+        add:
+          - { CAP }
+        drop:
+          - { CAP }
 pods:
   - name: { pod_name }
     depends:
@@ -16,8 +38,6 @@ pods:
         image: { init_image }
     containers:
       - name: { container_name }
-        ports:
-          - { port }
         waitingFor:
           httpGet:
             path: /healthz
@@ -31,9 +51,6 @@ pods:
         user: { user }
         volumeMounts:
           - name: workdir
-            mountPath: "/work-dir"
-        bindMounts:
-          - hostPath: "/home"
             mountPath: "/work-dir"
         workingDir: /home
         env:
