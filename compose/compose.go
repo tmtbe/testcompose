@@ -196,8 +196,11 @@ func (c *Compose) StartUserTrigger(ctx context.Context, name string) error {
 	if c.config.Trigger[name] == nil {
 		return nil
 	}
+	c.ready = false
 	triggerName := "user_trigger_" + name
-	return c.podCompose.StartTrigger(triggerName, c.config.Trigger[name], ctx)
+	err := c.podCompose.StartTrigger(triggerName, c.config.Trigger[name], ctx)
+	c.ready = true
+	return err
 }
 
 func (c *Compose) StopPods(ctx context.Context) {

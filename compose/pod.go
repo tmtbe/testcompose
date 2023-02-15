@@ -56,6 +56,16 @@ func (p *PodCompose) StartTrigger(podName string, containers []*ContainerConfig,
 		Type: event.PodEventStartType,
 		Name: podName,
 	})
+	// clean trigger pod containers
+	cs, err := p.dockerProvider.FindAllContainersWithSessionId(ctx, p.sessionId)
+	if err != nil {
+		return err
+	}
+	for _, c := range cs {
+		if c.Labels[common.LabelPodName] == podName {
+			_ = p.dockerProvider.RemoveContainer(ctx, c.ID)
+		}
+	}
 	// create pause container
 	pauseContainer, err := p.dockerProvider.RunContainer(ctx, docker.ContainerRequest{
 		Name: common.ContainerNamePrefix + podName + "_pause_" + p.sessionId,

@@ -6,7 +6,12 @@ volumes:
     emptyDir: {}
 trigger:
   runTest:
-    - name: do-curl
+    - name: do-curl1
+      image: alpine/curl
+      command:
+        - curl
+        - "demo/inbound"
+    - name: do-curl2
       image: alpine/curl
       command:
         - curl
@@ -39,6 +44,8 @@ pods:
         volumeMounts:
           - name: collector
             mountPath: "/home"
+        env:
+          JAEGER_HOST: jaeger
   - name: jaeger
     containers:
       - name: jaeger-all
