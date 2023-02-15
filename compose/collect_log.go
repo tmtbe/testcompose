@@ -2,7 +2,7 @@ package compose
 
 import (
 	"context"
-	"fmt"
+	"go.uber.org/zap"
 	"podcompose/docker"
 	"strings"
 )
@@ -12,7 +12,7 @@ type AgentLog struct {
 }
 
 func (a *AgentLog) Accept(log docker.Log) {
-	fmt.Printf("%s | %s", strings.TrimLeft(a.Name, "/"), string(log.Content))
+	zap.L().Sugar().Debugf("%s | %s", strings.TrimLeft(a.Name, "/"), string(log.Content))
 }
 func collectLogs(name *string, container docker.Container) {
 	ctx := context.Background()

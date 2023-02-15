@@ -65,7 +65,7 @@ func (s *Starter) start() error {
 	if err != nil {
 		return err
 	}
-	err = s.compose.StartSystemAopBefore(ctx)
+	err = s.compose.StartSystemTriggerStart(ctx)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (s *Starter) start() error {
 func (s *Starter) stop() error {
 	if s.compose.IsReady() {
 		ctx := context.Background()
-		err := s.compose.StartSystemAopAfter(ctx)
+		err := s.compose.StartSystemTriggerStop(ctx)
 		if err != nil {
 			return err
 		}

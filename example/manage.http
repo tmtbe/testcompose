@@ -1,16 +1,3 @@
-# curl --location --request POST 'http://localhost:51783/restart'
-#--header 'Content-Type: text/plain'
-#--data-raw '["mysql"]'
-POST http://localhost:{{port}}/restart
-Content-Type: text/plain
-
-["mysql"]
-
-###
-
-# curl --location --request POST 'http://localhost:51783/ingress'
-#--header 'Content-Type: text/plain'
-#--data-raw '{"nginx":"80:39000"}'
 POST http://localhost:{{port}}/ingress
 Content-Type: text/plain
 
@@ -18,9 +5,20 @@ Content-Type: text/plain
 
 ###
 
-# curl --location --request POST 'http://localhost:51783/switch'
-#--header 'Content-Type: text/plain'
-#--data-raw '{"nginx":"data2"}'
+POST http://localhost:{{port}}/trigger
+Content-Type: text/plain
+
+{"name":"runTest"}
+
+###
+
+POST http://localhost:{{port}}/restart
+Content-Type: text/plain
+
+["mysql"]
+
+###
+
 POST http://localhost:{{port}}/switch
 Content-Type: text/plain
 
@@ -28,22 +26,18 @@ Content-Type: text/plain
 
 ###
 
-# curl --location --request POST 'http://localhost:51783/shutdown'
 POST http://localhost:{{port}}/shutdown
 
 ###
 
-# curl --location --request POST 'http://localhost:51783/stop'
 POST http://localhost:{{port}}/stop
 
 ###
 
-# curl --location --request GET 'http://localhost:51783/info'
 GET http://localhost:{{port}}/info
 
 ###
 
-# curl --location --request POST 'http://localhost:51783/start'
 POST http://localhost:{{port}}/start
 
 ###

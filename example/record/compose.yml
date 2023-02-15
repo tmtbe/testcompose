@@ -4,40 +4,33 @@ volumes:
     emptyDir: {}
   - name: test
     emptyDir: {}
-before:
-after:
-  - name: do-curl
-    image: alpine/curl
-    command:
-      - curl
-      - "demo/inbound"
-  - name: do-import-jaeger
-    image: alpine/curl
-    command:
-      - curl
-      - --request
-      - POST
-      - "collector/import"
-  - name: do-copy-gen
-    image: ubuntu
-    volumeMounts:
-      - name: collector
-        mountPath: /home
-    bindMounts:
-      - hostPath: ./docs
-        mountPath: /docs
-    command:
-      - cp
-      - -r
-      - /home
-      - /docs
-#  - name: do-shutdown
-#    image: alpine/curl
-#    command:
-#      - curl
-#      - --request
-#      - POST
-#      - "agent/shutdown"
+trigger:
+  runTest:
+    - name: do-curl
+      image: alpine/curl
+      command:
+        - curl
+        - "demo/inbound"
+    - name: do-import-jaeger
+      image: alpine/curl
+      command:
+        - curl
+        - --request
+        - POST
+        - "collector/import"
+    - name: do-copy-gen
+      image: ubuntu
+      volumeMounts:
+        - name: collector
+          mountPath: /home
+      bindMounts:
+        - hostPath: ./docs
+          mountPath: /docs
+      command:
+        - cp
+        - -r
+        - /home
+        - /docs
 pods:
   - name: collector
     containers:

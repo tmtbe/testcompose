@@ -47,15 +47,8 @@ func NewPodCompose(sessionID string, hostContextPath string, pods []*PodConfig, 
 		}, nil
 	}
 }
-func (p *PodCompose) StartSystemAopBefore(beforeContainers []*ContainerConfig, ctx context.Context) error {
-	return p.startSystemAop("system_aop_before", beforeContainers, ctx)
-}
 
-func (p *PodCompose) StartSystemAopAfter(afterContainers []*ContainerConfig, ctx context.Context) error {
-	return p.startSystemAop("system_aop_after", afterContainers, ctx)
-}
-
-func (p *PodCompose) startSystemAop(podName string, containers []*ContainerConfig, ctx context.Context) error {
+func (p *PodCompose) StartTrigger(podName string, containers []*ContainerConfig, ctx context.Context) error {
 	event.Publish(ctx, &event.PodEventData{
 		TracingData: event.TracingData{
 			PodName: podName,

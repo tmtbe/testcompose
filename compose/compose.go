@@ -175,18 +175,29 @@ func (c *Compose) PrepareNetwork(ctx context.Context) error {
 	return nil
 }
 
-func (c *Compose) StartSystemAopBefore(ctx context.Context) error {
-	if c.config.Before == nil {
+func (c *Compose) StartSystemTriggerStart(ctx context.Context) error {
+	if c.config.Trigger["start"] == nil {
 		return nil
 	}
-	return c.podCompose.StartSystemAopBefore(c.config.Before, ctx)
+	return c.podCompose.StartTrigger("system_trigger_start", c.config.Trigger["start"], ctx)
 }
 
-func (c *Compose) StartSystemAopAfter(ctx context.Context) error {
-	if c.config.After == nil {
+func (c *Compose) StartSystemTriggerStop(ctx context.Context) error {
+	if c.config.Trigger["stop"] == nil {
 		return nil
 	}
-	return c.podCompose.StartSystemAopAfter(c.config.After, ctx)
+	return c.podCompose.StartTrigger("system_trigger_stop", c.config.Trigger["stop"], ctx)
+}
+
+func (c *Compose) StartUserTrigger(ctx context.Context, name string) error {
+	if !c.ready {
+		return errors.Errorf("compose is not ready, can not trigger task")
+	}
+	if c.config.Trigger[name] == nil {
+		return nil
+	}
+	triggerName := "user_trigger_" + name
+	return c.podCompose.StartTrigger(triggerName, c.config.Trigger[name], ctx)
 }
 
 func (c *Compose) StopPods(ctx context.Context) {
