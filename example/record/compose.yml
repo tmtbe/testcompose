@@ -23,6 +23,17 @@ trigger:
         - --request
         - POST
         - "collector/import"
+    - name: do-create-mock
+      image: testmesh/mockserver
+      volumeMounts:
+        - name: collector
+          mountPath: /home
+      command:
+        - stubby
+        - -i
+        - /home/dump.json
+        - -o
+        - /home
     - name: do-copy-gen
       image: ubuntu
       volumeMounts:
@@ -40,7 +51,7 @@ pods:
   - name: collector
     containers:
       - name: collector
-        image: mockest/collector
+        image: testmesh/collector
         volumeMounts:
           - name: collector
             mountPath: "/home"
@@ -53,7 +64,7 @@ pods:
   - name: demo
     initContainers:
       - name: proxy-init
-        image: mockest/proxy
+        image: testmesh/proxy
         command:
           - init
         user: 0
@@ -63,15 +74,15 @@ pods:
             - NET_RAW
     containers:
       - name: app
-        image: mockest/demo
+        image: testmesh/demo
       - name: proxy
-        image: mockest/proxy
+        image: testmesh/proxy
         command:
           - proxy
   - name: outbound-demo
     initContainers:
       - name: proxy-init
-        image: mockest/proxy
+        image: testmesh/proxy
         command:
           - init
         user: 0
@@ -81,8 +92,8 @@ pods:
             - NET_RAW
     containers:
       - name: app
-        image: mockest/demo
+        image: testmesh/demo
       - name: proxy
-        image: mockest/proxy
+        image: testmesh/proxy
         command:
           - proxy
