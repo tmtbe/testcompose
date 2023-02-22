@@ -53,17 +53,26 @@ func (s *Starter) start() error {
 		s.isStarted = true
 	}()
 	ctx := context.Background()
-	selectData := make(map[string]string)
-	for _, v := range s.compose.GetConfig().Volumes {
-		selectData[v.Name] = common.DefaultSwitchDataName
-	}
-	err := s.compose.CreateVolumes(ctx)
+	// create volume
+	err := s.compose.CreateVolumes(ctx, s.compose.GetConfig().Volumes)
 	if err != nil {
 		return err
 	}
-	err = s.agent.StartAgentForSetVolume(ctx, selectData)
+	err = s.agent.StartAgentForSetVolume(ctx)
 	if err != nil {
 		return err
+	}
+	// create volume group default
+	if len(s.compose.GetConfig().VolumeGroups) > 0 {
+		defaultGroup := s.compose.GetConfig().VolumeGroups[0]
+		err := s.compose.CreateVolumesWithGroup(ctx, defaultGroup)
+		if err != nil {
+			return err
+		}
+		err = s.agent.StartAgentForSetVolumeGroup(ctx, 0)
+		if err != nil {
+			return err
+		}
 	}
 	err = s.compose.StartSystemTriggerStart(ctx)
 	if err != nil {
@@ -111,19 +120,6 @@ func (s *Starter) startWebServer() error {
 	}
 	zap.L().Sugar().Info("Server exiting")
 	return nil
-}
-
-func (s *Starter) switchData(selectData map[string]string) error {
-	ctx := context.Background()
-	volumeNames := make([]string, 0)
-	for volumeName := range selectData {
-		volumeNames = append(volumeNames, volumeName)
-	}
-	err := s.compose.RecreateVolumes(ctx, volumeNames)
-	if err != nil {
-		return err
-	}
-	return s.agent.StartAgentForSetVolume(ctx, selectData)
 }
 
 func (s *Starter) prepareIngressVolume(servicePortMap map[string]string) error {

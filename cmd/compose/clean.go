@@ -54,7 +54,7 @@ func (c *CleanCmd) clean(allFlag bool) error {
 		for _, volume := range volumes {
 			if _, ok := protect[volume.Labels[docker.ComposeSessionID]]; !ok {
 				zap.L().Sugar().Infof("remove volume:%s", volume.Name)
-				err := c.dockerProvider.RemoveVolume(ctx, volume.Name, true)
+				err := c.dockerProvider.RemoveVolume(ctx, volume.Name, "", true)
 				if err != nil {
 					zap.L().Sugar().Error(err)
 				}

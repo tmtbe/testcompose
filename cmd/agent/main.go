@@ -26,21 +26,24 @@ func main() {
 			cleaner.clear()
 		},
 	}
-	prepareVolumeDataCmd := &cobra.Command{
-		Use: "prepareVolumeData",
+	prepareVolumeCmd := &cobra.Command{
+		Use: "prepareVolume",
 		Run: func(cmd *cobra.Command, args []string) {
-			selectArr, err := cmd.Flags().GetStringArray("select")
 			handleError(err)
-			selectMap := make(map[string]string)
-			for _, selectGroup := range selectArr {
-				selectGroupSplit := strings.Split(selectGroup, "=")
-				selectMap[selectGroupSplit[0]] = selectGroupSplit[1]
-			}
-			err = volume.copyDataToVolumes(selectMap)
+			err = volume.copyDataToVolume(volume.GetConfig().Volumes)
 			handleError(err)
 		},
 	}
-	prepareVolumeDataCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
+	prepareVolumeGroupCmd := &cobra.Command{
+		Use: "prepareVolumeGroup",
+		Run: func(cmd *cobra.Command, args []string) {
+			selectGroupIndex, err := cmd.Flags().GetInt("selectGroupIndex")
+			handleError(err)
+			err = volume.copyDataToVolumeGroup(selectGroupIndex)
+			handleError(err)
+		},
+	}
+	prepareVolumeGroupCmd.Flags().IntP("selectGroupIndex", "s", 0, "select volume group")
 	startCmd := &cobra.Command{
 		Use: "start",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -66,21 +69,6 @@ func main() {
 		},
 	}
 	startCmd.Flags().Bool("autoStart", true, "auto start compose")
-	switchCmd := &cobra.Command{
-		Use: "switch",
-		Run: func(cmd *cobra.Command, args []string) {
-			selectArr, err := cmd.Flags().GetStringArray("select")
-			handleError(err)
-			selectMap := make(map[string]string)
-			for _, selectGroup := range selectArr {
-				selectGroupSplit := strings.Split(selectGroup, "=")
-				selectMap[selectGroupSplit[0]] = selectGroupSplit[1]
-			}
-			err = runner.switchData(selectMap)
-			handleError(err)
-		},
-	}
-	switchCmd.Flags().StringArrayP("select", "s", []string{}, "select volume and switch data")
 	prepareIngressVolumeCmd := &cobra.Command{
 		Use: "prepareIngressVolume",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -97,9 +85,9 @@ func main() {
 	}
 	prepareIngressVolumeCmd.Flags().StringArrayP("ports", "p", []string{}, "service port mapping")
 	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(switchCmd)
 	rootCmd.AddCommand(cleanCmd)
-	rootCmd.AddCommand(prepareVolumeDataCmd)
+	rootCmd.AddCommand(prepareVolumeCmd)
+	rootCmd.AddCommand(prepareVolumeGroupCmd)
 	rootCmd.AddCommand(prepareIngressVolumeCmd)
 	err = rootCmd.Execute()
 	handleError(err)

@@ -15,14 +15,14 @@ Content-Type: text/plain
 POST http://localhost:{{port}}/restart
 Content-Type: text/plain
 
-["mysql"]
+["jaeger"]
 
 ###
 
 POST http://localhost:{{port}}/switch
 Content-Type: text/plain
 
-{"nginx":"data2"}
+{"name":"group2"}
 
 ###
 

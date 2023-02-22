@@ -79,7 +79,7 @@ func (p *PodCompose) StartTrigger(podName string, containers []*ContainerConfig,
 			common.LabelPodName:       podName,
 			common.LabelContainerName: "pause",
 		},
-		AutoRemove: common.AgentAutoRemove,
+		AutoRemove: true,
 	}, p.sessionId)
 	if err != nil {
 		return err

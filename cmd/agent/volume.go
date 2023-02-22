@@ -31,29 +31,24 @@ func NewVolume(workspace string, sessionId string) (*Volume, error) {
 		Compose: c,
 	}, nil
 }
-
-func (v *Volume) copyDataToVolumes(nameAndData map[string]string) error {
-	for _, v := range v.Compose.GetConfig().Volumes {
-		if selectData, ok := nameAndData[v.Name]; ok {
-			if v.SwitchData != nil {
-				hostPath, ok := v.SwitchData[selectData]
-				if !ok {
-					return errors.Errorf("select data %s is not exist", selectData)
-				}
-				sourcePath := filepath.Join(common.AgentContextPath, hostPath)
-				targetPath := filepath.Join(common.AgentVolumePath, v.Name)
-				rd, err := ioutil.ReadDir(sourcePath)
-				if err != nil {
-					return err
-				}
-				for _, fi := range rd {
-					stdout, err := exec.Command("cp", "-r", filepath.Join(sourcePath, fi.Name()), targetPath).CombinedOutput()
-					if err != nil {
-						return errors.Wrap(err, string(stdout))
-					}
-				}
+func (v *Volume) copyDataToVolume(volumeConfigs []*compose.VolumeConfig) error {
+	for _, volume := range volumeConfigs {
+		hostPath := volume.Path
+		sourcePath := filepath.Join(common.AgentContextPath, hostPath)
+		targetPath := filepath.Join(common.AgentVolumePath, volume.Name)
+		rd, err := ioutil.ReadDir(sourcePath)
+		if err != nil {
+			return err
+		}
+		for _, fi := range rd {
+			stdout, err := exec.Command("cp", "-r", filepath.Join(sourcePath, fi.Name()), targetPath).CombinedOutput()
+			if err != nil {
+				return errors.Wrap(err, string(stdout))
 			}
 		}
 	}
 	return nil
+}
+func (v *Volume) copyDataToVolumeGroup(selectGroupIndex int) error {
+	return v.copyDataToVolume(v.GetConfig().VolumeGroups[selectGroupIndex].Volumes)
 }

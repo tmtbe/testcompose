@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"os"
-	"podcompose/common"
 	_ "podcompose/event"
 )
 
@@ -22,7 +21,6 @@ func main() {
 			}
 			if debug {
 				_ = os.Setenv("TPC_DEBUG", "true")
-				common.AgentAutoRemove = false
 				InitLogger()
 			}
 			autoStart, err := cmd.Flags().GetBool("autoStart")

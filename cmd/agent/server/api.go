@@ -98,7 +98,9 @@ func (a *Api) GetRoute() *gin.Engine {
 	})
 	router.POST(common.EndPointAgentSwitchData, func(c *gin.Context) {
 		ctx := context.Background()
-		type SwitchDataBody map[string]string
+		type SwitchDataBody struct {
+			Name string
+		}
 		var switchDataBody SwitchDataBody
 		err := c.BindJSON(&switchDataBody)
 		if err != nil {
@@ -107,9 +109,15 @@ func (a *Api) GetRoute() *gin.Engine {
 			})
 			return
 		}
+		selectVolumeGroup, selectGroupIndex := a.compose.GetConfig().VolumeGroups.GetGroup(switchDataBody.Name)
+		if selectVolumeGroup == nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "not found group",
+			})
+		}
 		volumeNames := make([]string, 0)
-		for volumeName := range switchDataBody {
-			volumeNames = append(volumeNames, volumeName)
+		for _, volume := range selectVolumeGroup.Volumes {
+			volumeNames = append(volumeNames, volume.Name)
 		}
 		pods := a.compose.FindPodsWhoUsedVolumes(volumeNames)
 		podNames := make([]string, len(pods))
@@ -117,7 +125,11 @@ func (a *Api) GetRoute() *gin.Engine {
 			podNames[k] = v.Name
 		}
 		err = a.compose.RestartPods(ctx, podNames, func() error {
-			return a.agent.StartAgentForSwitchData(ctx, switchDataBody)
+			err := a.compose.RecreateVolumesWithGroup(ctx, a.compose.GetConfig().VolumeGroups[selectGroupIndex])
+			if err != nil {
+				return err
+			}
+			return a.agent.StartAgentForSetVolumeGroup(ctx, selectGroupIndex)
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{

@@ -1,9 +1,7 @@
 version: 1
 volumes:
   - name: collector
-    emptyDir: {}
   - name: test
-    emptyDir: {}
 trigger:
   runTest:
     - name: do-curl1

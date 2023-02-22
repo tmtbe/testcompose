@@ -1,11 +1,13 @@
 version: 1
-volumes:
-  - name: nginx
-    switchData:
-      default: ./switch_data_1
-      data2: ./switch_data_2
-before:
-after:
+volumeGroups:
+  - name: group1
+    volumes:
+      - name: nginx
+        path: ./switch_data_1
+  - name: group2
+    volumes:
+      - name: nginx
+        path: ./switch_data_2
 pods:
   - name: nginx
     containers:

@@ -16,7 +16,7 @@ type Compose struct {
 	podCompose      *PodCompose
 	config          *ComposeConfig
 	dockerProvider  *docker.DockerProvider
-	volume          *Volume
+	volume          *VolumeGroups
 	contextPath     string
 	hostContextPath string
 	ready           bool
@@ -52,7 +52,7 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string, hostCo
 		podCompose:      compose,
 		config:          &config,
 		dockerProvider:  provider,
-		volume:          NewVolumes(config.Volumes, provider),
+		volume:          NewVolumeGroups(config.VolumeGroups, provider),
 		contextPath:     contextPath,
 		hostContextPath: hostContextPath,
 	}, nil
@@ -86,12 +86,14 @@ func (c *Compose) StartPods(ctx context.Context) error {
 	return err
 }
 
-func (c *Compose) CreateVolumes(ctx context.Context) error {
-	return c.volume.createVolumes(ctx, c.GetConfig().SessionId)
+func (c *Compose) CreateVolumesWithGroup(ctx context.Context, defaultGroup *VolumeGroupConfig) error {
+	return c.volume.createVolumesWithGroup(ctx, c.GetConfig().SessionId, defaultGroup)
 }
-
-func (c *Compose) RecreateVolumes(ctx context.Context, names []string) error {
-	return c.volume.recreateVolumes(ctx, names, c.GetConfig().SessionId)
+func (c *Compose) CreateVolumes(ctx context.Context, volumes []*VolumeConfig) error {
+	return c.volume.createVolumes(ctx, c.GetConfig().SessionId, volumes)
+}
+func (c *Compose) RecreateVolumesWithGroup(ctx context.Context, volumeGroup *VolumeGroupConfig) error {
+	return c.volume.recreateVolumesWithGroup(ctx, volumeGroup, c.GetConfig().SessionId)
 }
 
 func (c *Compose) FindPodsWhoUsedVolumes(volumeNames []string) []*PodConfig {
@@ -220,6 +222,6 @@ func (c *Compose) StopPods(ctx context.Context) {
 		return
 	}
 	for _, volume := range vs {
-		_ = c.dockerProvider.RemoveVolume(ctx, volume.Name, true)
+		_ = c.dockerProvider.RemoveVolume(ctx, volume.Name, c.GetSessionId(), true)
 	}
 }

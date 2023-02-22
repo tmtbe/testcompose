@@ -55,11 +55,14 @@ func (a *Agent) GetSessionId() string {
 	return a.composeProvider.GetSessionId()
 }
 func (a *Agent) GetInfo() Info {
-	volumeInfos := make([]VolumeInfo, len(a.composeProvider.GetConfig().Volumes))
-	for i, v := range a.composeProvider.GetConfig().Volumes {
-		volumeInfos[i] = VolumeInfo{
-			Name:     v.Name,
-			VolumeId: v.Name + "_" + genSessionId(),
+	var volumeInfos []VolumeInfo
+	if len(a.composeProvider.GetConfig().VolumeGroups) > 0 {
+		volumeInfos := make([]VolumeInfo, len(a.composeProvider.GetConfig().VolumeGroups[0].Volumes))
+		for i, v := range a.composeProvider.GetConfig().VolumeGroups[0].Volumes {
+			volumeInfos[i] = VolumeInfo{
+				Name:     v.Name,
+				VolumeId: v.Name + "_" + genSessionId(),
+			}
 		}
 	}
 	ctx := context.Background()
@@ -115,26 +118,20 @@ func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeServer,
 		},
-		AutoRemove: common.AgentAutoRemove,
+		AutoRemove: true,
 	}, a.composeProvider.GetSessionId())
 }
 
-func (a *Agent) StartAgentForSetVolume(ctx context.Context, selectData map[string]string) error {
+func (a *Agent) StartAgentForSetVolume(ctx context.Context) error {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
 
 	cmd := make([]string, 0)
-	cmd = append(cmd, "prepareVolumeData")
-	for volumeName, selectDataName := range selectData {
-		cmd = append(cmd, "-s")
-		cmd = append(cmd, volumeName+"="+selectDataName)
-	}
+	cmd = append(cmd, "prepareVolume")
 	for _, volume := range a.composeProvider.GetConfig().Volumes {
-		if _, ok := selectData[volume.Name]; ok {
-			volumeName := volume.Name + "_" + a.composeProvider.GetSessionId()
-			agentMounts = append(agentMounts, docker.VolumeMount(volumeName, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
-		}
+		volumeId := volume.Name + "_" + a.composeProvider.GetSessionId()
+		agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
 	}
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.ImageAgent,
@@ -149,7 +146,35 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context, selectData map[strin
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeVolume,
 		},
-	}, common.AgentAutoRemove)
+	}, true)
+}
+func (a *Agent) StartAgentForSetVolumeGroup(ctx context.Context, selectGroupIndex int) error {
+	agentMounts := make([]docker.ContainerMount, 0)
+	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
+	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
+
+	cmd := make([]string, 0)
+	cmd = append(cmd, "prepareVolumeGroup")
+	cmd = append(cmd, "-s")
+	cmd = append(cmd, strconv.Itoa(selectGroupIndex))
+	for _, volume := range a.composeProvider.GetConfig().VolumeGroups[selectGroupIndex].Volumes {
+		volumeId := volume.Name + "_" + a.composeProvider.GetSessionId()
+		agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
+	}
+	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
+		Image: common.ImageAgent,
+		Name:  common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId(),
+		Env: map[string]string{
+			common.LabelSessionID:     a.composeProvider.GetSessionId(),
+			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
+			common.TpcDebug:           os.Getenv(common.TpcDebug),
+		},
+		Mounts: agentMounts,
+		Cmd:    cmd,
+		Labels: map[string]string{
+			docker.AgentType: docker.AgentTypeVolume,
+		},
+	}, true)
 }
 
 func (a *Agent) StartAgentForClean(ctx context.Context) error {
@@ -165,27 +190,19 @@ func (a *Agent) StartAgentForClean(ctx context.Context) error {
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeCleaner,
 		},
-		AutoRemove: common.AgentAutoRemove, //clean must set auto remove,agent cannot remove clean container
-	}, common.AgentAutoRemove)
+		AutoRemove: true, //clean must set auto remove,agent cannot remove clean container
+	}, true)
 }
 
-func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[string]string) error {
+func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectGroupIndex int) error {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
 
 	cmd := make([]string, 0)
 	cmd = append(cmd, "switch")
-	for volumeName, selectDataName := range selectData {
-		cmd = append(cmd, "-s")
-		cmd = append(cmd, volumeName+"="+selectDataName)
-	}
-	for _, volume := range a.composeProvider.GetConfig().Volumes {
-		if _, ok := selectData[volume.Name]; ok {
-			volumeName := volume.Name + "_" + a.composeProvider.GetSessionId()
-			agentMounts = append(agentMounts, docker.VolumeMount(volumeName, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
-		}
-	}
+	cmd = append(cmd, "-s")
+	cmd = append(cmd, strconv.Itoa(selectGroupIndex))
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.ImageAgent,
 		Name:  common.ContainerNamePrefix + "agent_switch_" + a.composeProvider.GetSessionId(),
@@ -199,12 +216,12 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectData map[stri
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeSwitchData,
 		},
-	}, common.AgentAutoRemove)
+	}, true)
 }
-func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName string, servicePortInfo map[string]string) error {
+func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeId string, servicePortInfo map[string]string) error {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
-	agentMounts = append(agentMounts, docker.VolumeMount(volumeName, docker.ContainerMountTarget(filepath.Join(common.AgentVolumePath, common.IngressVolumeName))))
+	agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(filepath.Join(common.AgentVolumePath, common.IngressVolumeName))))
 	cmd := make([]string, 0)
 	cmd = append(cmd, "prepareIngressVolume")
 	for serviceName, portMapping := range servicePortInfo {
@@ -224,11 +241,12 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeName st
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeIngressVolume,
 		},
-	}, common.AgentAutoRemove)
+	}, true)
 }
 
 func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[string]string) (docker.Container, error) {
-	volumeName := common.IngressVolumeName + "_" + a.GetSessionId()
+	volumeName := common.IngressVolumeName
+	volumeId := volumeName + "_" + a.GetSessionId()
 	containerName := common.ContainerNamePrefix + "agent_ingress_" + a.composeProvider.GetSessionId()
 	// first remove ingress container
 	ingressContainer, _ := a.composeProvider.GetDockerProvider().FindContainerByName(ctx, containerName)
@@ -236,14 +254,14 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		_ = a.composeProvider.GetDockerProvider().RemoveContainer(ctx, ingressContainer.ID)
 	}
 	// then remove ingress volume
-	_ = a.composeProvider.GetDockerProvider().RemoveVolume(ctx, volumeName, true)
+	_ = a.composeProvider.GetDockerProvider().RemoveVolume(ctx, volumeName, a.GetSessionId(), true)
 	// create ingress volume
-	_, err := a.composeProvider.GetDockerProvider().CreateVolume(ctx, volumeName, a.GetSessionId())
+	_, err := a.composeProvider.GetDockerProvider().CreateVolume(ctx, volumeName, a.GetSessionId(), "")
 	if err != nil {
 		return nil, err
 	}
 	// prepare volume
-	err = a.startAgentForIngressSetVolume(ctx, volumeName, servicePortInfo)
+	err = a.startAgentForIngressSetVolume(ctx, volumeId, servicePortInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +274,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 	container, err := a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
 		Image:  common.ImageIngress,
 		Name:   containerName,
-		Mounts: docker.Mounts(docker.VolumeMount(volumeName, "/etc/envoy")),
+		Mounts: docker.Mounts(docker.VolumeMount(volumeId, "/etc/envoy")),
 		Env: map[string]string{
 			common.TpcDebug: os.Getenv(common.TpcDebug),
 		},

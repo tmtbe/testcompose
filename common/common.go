@@ -28,8 +28,5 @@ const EnvHostContextPath = "HOST_CONTEXT_PATH"
 const ConfigFileName = "compose.yml"
 
 const IngressVolumeName = "ingress"
-const DefaultSwitchDataName = "default"
 const InitExitTimeOut = 60000
 const ContainerNamePrefix = "tpc_"
-
-var AgentAutoRemove = true

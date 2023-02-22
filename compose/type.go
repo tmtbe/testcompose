@@ -1,19 +1,20 @@
 package compose
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
-	"podcompose/common"
 )
 
 type ComposeConfig struct {
-	Version   string                        `json:"version" yaml:"version"`
-	SessionId string                        `json:"sessionId" yaml:"sessionId"`
-	Network   string                        `json:"network" yaml:"network"`
-	Trigger   map[string][]*ContainerConfig `json:"trigger" yaml:"trigger"`
-	Pods      []*PodConfig                  `json:"pods" yaml:"pods"`
-	Volumes   []*VolumeConfig               `json:"volumes" yaml:"volumes"`
+	Version      string                        `json:"version" yaml:"version"`
+	SessionId    string                        `json:"sessionId" yaml:"sessionId"`
+	Network      string                        `json:"network" yaml:"network"`
+	Trigger      map[string][]*ContainerConfig `json:"trigger" yaml:"trigger"`
+	Pods         []*PodConfig                  `json:"pods" yaml:"pods"`
+	VolumeGroups VolumeGroupConfigs            `json:"volumeGroups" yaml:"volumeGroups"`
+	Volumes      []*VolumeConfig               `json:"volumes" yaml:"volumes"`
 }
 
 func (c *ComposeConfig) GetNetworkName() string {
@@ -32,6 +33,7 @@ func (c *ComposeConfig) check(contextPath string) error {
 		return errors.New("not init session id")
 	}
 	podMap := make(map[string]string)
+	needVolumeMap := make(map[string]string)
 	for _, pod := range c.Pods {
 		if _, ok := podMap[pod.Name]; ok {
 			return errors.Errorf("duplicate pod name:%s", pod.Name)
@@ -40,44 +42,80 @@ func (c *ComposeConfig) check(contextPath string) error {
 		if err := pod.check(c); err != nil {
 			return err
 		}
-	}
-	volumeMap := make(map[string]string)
-	for _, v := range c.Volumes {
-		if _, ok := volumeMap[v.Name]; ok {
-			return errors.Errorf("duplicate volume name:%s", v.Name)
+		for _, c := range pod.InitContainers {
+			for _, vm := range c.VolumeMounts {
+				needVolumeMap[vm.Name] = vm.Name
+			}
 		}
-		volumeMap[v.Name] = v.Name
-		if err := v.check(contextPath); err != nil {
-			return err
+		for _, c := range pod.Containers {
+			for _, vm := range c.VolumeMounts {
+				needVolumeMap[vm.Name] = vm.Name
+			}
+		}
+	}
+	for _, v := range c.Volumes {
+		delete(needVolumeMap, v.Name)
+	}
+	for _, vg := range c.VolumeGroups {
+		volumeCheck := make(map[string]bool)
+		for name := range needVolumeMap {
+			volumeCheck[name] = false
+		}
+		for _, v := range vg.Volumes {
+			_, ok := volumeCheck[v.Name]
+			if ok {
+				volumeCheck[v.Name] = true
+			} else {
+				return errors.New(fmt.Sprintf("volumeGroup name:%s, %s may be not need", vg.Name, v.Name))
+			}
+			err := v.check(contextPath)
+			if err != nil {
+				return err
+			}
+		}
+		for name, check := range volumeCheck {
+			if !check {
+				return errors.New(fmt.Sprintf("can not found volume %s", name))
+			}
 		}
 	}
 	return nil
 }
 
+type VolumeGroupConfigs []*VolumeGroupConfig
+
+func (v VolumeGroupConfigs) GetGroup(name string) (*VolumeGroupConfig, int) {
+	var selectVolumeGroup *VolumeGroupConfig
+	var selectIndex int
+	for index, volumeGroup := range v {
+		if volumeGroup.Name == name {
+			selectVolumeGroup = volumeGroup
+			selectIndex = index
+			break
+		}
+	}
+	return selectVolumeGroup, selectIndex
+}
+
+type VolumeGroupConfig struct {
+	Name    string          `json:"name" yaml:"name"`
+	Volumes []*VolumeConfig `json:"volumes"`
+}
+
 type VolumeConfig struct {
-	Name       string            `json:"name" yaml:"name"`
-	EmptyDir   map[string]string `json:"emptyDir" yaml:"emptyDir"`
-	SwitchData map[string]string `json:"switchData" yaml:"switchData"`
+	Name string `json:"name" yaml:"name"`
+	Path string `json:"path" yaml:"path"`
 }
 
 func (v *VolumeConfig) check(contextPath string) error {
 	if v.Name == "" {
 		return errors.New("volume name must be set")
 	}
-	if v.EmptyDir == nil && v.SwitchData == nil {
-		return errors.New("volume emptyDir hostPath cannot be null at the same time")
-	}
-	if v.SwitchData != nil {
-		_, ok := v.SwitchData[common.DefaultSwitchDataName]
-		if !ok {
-			return errors.Errorf("volume:[%s] not found \"%s\" data name", v.Name, common.DefaultSwitchDataName)
-		}
-		for _, path := range v.SwitchData {
-			fileName := filepath.Join(contextPath, path)
-			_, err := os.Stat(fileName)
-			if err != nil {
-				return err
-			}
+	if v.Path != "" {
+		fileName := filepath.Join(contextPath, v.Path)
+		_, err := os.Stat(fileName)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -140,11 +178,6 @@ func (cc *ContainerConfig) check(c *ComposeConfig) error {
 	if cc == nil {
 		return nil
 	}
-	for _, vm := range cc.VolumeMounts {
-		if err := vm.check(c); err != nil {
-			return err
-		}
-	}
 	return cc.WaitingFor.check()
 }
 
@@ -156,20 +189,6 @@ type VolumeMountConfig struct {
 type BindMountConfig struct {
 	HostPath  string `json:"hostPath" yaml:"hostPath"`
 	MountPath string `json:"mountPath" yaml:"mountPath"`
-}
-
-func (vm *VolumeMountConfig) check(c *ComposeConfig) error {
-	if vm == nil {
-		return nil
-	}
-	volumeMap := make(map[string]string)
-	for _, v := range c.Volumes {
-		volumeMap[v.Name] = v.Name
-	}
-	if _, ok := volumeMap[vm.Name]; !ok {
-		return errors.Errorf("%s is not found in volumes", vm.Name)
-	}
-	return nil
 }
 
 type EnvConfig struct {

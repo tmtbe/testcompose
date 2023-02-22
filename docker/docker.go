@@ -38,6 +38,7 @@ const (
 	Host                   = "DOCKER_HOST"
 	PodContainerLabel      = "PodContainer"
 	ComposeSessionID       = "ComposeSessionID"
+	VolumeGroup            = "VolumeGroup"
 	AgentType              = "AgentType"
 	AgentTypeCleaner       = "cleaner"
 	AgentTypeServer        = "server"
@@ -476,41 +477,24 @@ func (p *DockerProvider) GetGatewayIP(ctx context.Context) (string, error) {
 
 	return ip, nil
 }
-func (p *DockerProvider) CreateVolume(ctx context.Context, name string, sessionId string) (types.Volume, error) {
+func (p *DockerProvider) CreateVolume(ctx context.Context, name string, sessionId string, volumeGroup string) (types.Volume, error) {
 	return p.client.VolumeCreate(ctx, volume.VolumeCreateBody{
 		Driver: "local",
-		Name:   name,
+		Name:   name + "_" + sessionId,
 		Labels: map[string]string{
 			PodContainerLabel: "true",
 			ComposeSessionID:  sessionId,
+			VolumeGroup:       volumeGroup,
 		},
 	})
 }
-func (p *DockerProvider) RemoveVolumes(ctx context.Context, volumeNames []string, force bool) error {
-	vnMap := make(map[string]string)
-	for _, vn := range volumeNames {
-		vnMap[vn] = vn
-	}
-	filtersJSON := fmt.Sprintf(`{"label":{"%s":"true"}}`, PodContainerLabel)
-	fj, _ := filters.FromJSON(filtersJSON)
-	volumeList, err := p.client.VolumeList(ctx, fj)
-	if err != nil {
-		return err
-	}
-	for _, v := range volumeList.Volumes {
-		if _, ok := vnMap[v.Name]; ok {
-			err = p.RemoveVolume(ctx, v.Name, force)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
 
-func (p *DockerProvider) RemoveVolume(ctx context.Context, volumeID string, force bool) error {
-	zap.L().Sugar().Debugf("remove volume : %s", volumeID)
-	return p.client.VolumeRemove(ctx, volumeID, force)
+func (p *DockerProvider) RemoveVolume(ctx context.Context, volumeName string, sessionId string, force bool) error {
+	if !strings.HasSuffix(volumeName, sessionId) {
+		volumeName = volumeName + "_" + sessionId
+	}
+	zap.L().Sugar().Debugf("remove volume : %s", volumeName)
+	return p.client.VolumeRemove(ctx, volumeName, force)
 }
 
 func (p *DockerProvider) RemoveNetwork(ctx context.Context, networkID string) error {

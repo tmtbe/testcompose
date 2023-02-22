@@ -5,21 +5,21 @@ import (
 	"podcompose/docker"
 )
 
-type Volume struct {
-	volumes        []*VolumeConfig
-	dockerProvider *docker.DockerProvider
+type VolumeGroups struct {
+	volumeGroupConfigs []*VolumeGroupConfig
+	dockerProvider     *docker.DockerProvider
 }
 
-func NewVolumes(volumes []*VolumeConfig, dockerProvider *docker.DockerProvider) *Volume {
-	return &Volume{
-		volumes:        volumes,
-		dockerProvider: dockerProvider,
+func NewVolumeGroups(volumes []*VolumeGroupConfig, dockerProvider *docker.DockerProvider) *VolumeGroups {
+	return &VolumeGroups{
+		volumeGroupConfigs: volumes,
+		dockerProvider:     dockerProvider,
 	}
 }
 
-func (v *Volume) createVolumes(ctx context.Context, sessionId string) error {
-	for _, volume := range v.volumes {
-		_, err := v.dockerProvider.CreateVolume(ctx, volume.Name+"_"+sessionId, sessionId)
+func (v *VolumeGroups) createVolumes(ctx context.Context, sessionId string, volumes []*VolumeConfig) error {
+	for _, volume := range volumes {
+		_, err := v.dockerProvider.CreateVolume(ctx, volume.Name, sessionId, "")
 		if err != nil {
 			return err
 		}
@@ -27,13 +27,23 @@ func (v *Volume) createVolumes(ctx context.Context, sessionId string) error {
 	return nil
 }
 
-func (v *Volume) recreateVolumes(ctx context.Context, names []string, sessionId string) error {
-	err := v.dockerProvider.RemoveVolumes(ctx, names, true)
-	if err != nil {
-		return err
+func (v *VolumeGroups) createVolumesWithGroup(ctx context.Context, sessionId string, volumeGroup *VolumeGroupConfig) error {
+	for _, volume := range volumeGroup.Volumes {
+		_, err := v.dockerProvider.CreateVolume(ctx, volume.Name, sessionId, volumeGroup.Name)
+		if err != nil {
+			return err
+		}
 	}
-	for _, name := range names {
-		_, err := v.dockerProvider.CreateVolume(ctx, name, sessionId)
+	return nil
+}
+
+func (v *VolumeGroups) recreateVolumesWithGroup(ctx context.Context, volumeGroup *VolumeGroupConfig, sessionId string) error {
+	for _, volume := range volumeGroup.Volumes {
+		err := v.dockerProvider.RemoveVolume(ctx, volume.Name, sessionId, true)
+		if err != nil {
+			return err
+		}
+		_, err = v.dockerProvider.CreateVolume(ctx, volume.Name, sessionId, volumeGroup.Name)
 		if err != nil {
 			return err
 		}
