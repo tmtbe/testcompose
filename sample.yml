@@ -2,9 +2,12 @@ version: 1
 network: test
 volumes:
   - name: { name }
-    emptyDir: {}
-    switchData:
-      default: xxx
+    path: { path }
+volumeGroups:
+  - name: { group }
+    volumes:
+      - name: { name }
+        path: { path }
 trigger:
   { start }:
     - name: { container_name }

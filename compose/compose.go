@@ -1,12 +1,14 @@
 package compose
 
 import (
+	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 	"github.com/sony/sonyflake"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 	"path/filepath"
+	"podcompose/common"
 	"podcompose/docker"
 	"podcompose/event"
 	"strconv"
@@ -91,6 +93,9 @@ func (c *Compose) CreateVolumesWithGroup(ctx context.Context, defaultGroup *Volu
 }
 func (c *Compose) CreateVolumes(ctx context.Context, volumes []*VolumeConfig) error {
 	return c.volume.createVolumes(ctx, c.GetConfig().SessionId, volumes)
+}
+func (c *Compose) CreateSystemLogVolume(ctx context.Context) (types.Volume, error) {
+	return c.volume.createVolume(ctx, c.GetConfig().SessionId, common.SystemLogVolumeName)
 }
 func (c *Compose) RecreateVolumesWithGroup(ctx context.Context, volumeGroup *VolumeGroupConfig) error {
 	return c.volume.recreateVolumesWithGroup(ctx, volumeGroup, c.GetConfig().SessionId)

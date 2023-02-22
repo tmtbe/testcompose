@@ -1,11 +1,13 @@
 package common
 
 const TpcDebug = "TPC_DEBUG"
+const TpcName = "TPC_NAME"
 const ImageAgent = "podcompose/agent"
 const ImageIngress = "envoyproxy/envoy:v1.23-latest"
 const ImagePause = "gcr.io/google_containers/pause:3.0"
 
 const AgentContextPath = "/home/context/"
+const AgentLogPath = "/home/logs/"
 const AgentVolumePath = "/home/volumes/"
 const EndPointAgentStart = "/start"
 const EndPointAgentHealth = "/heath"
@@ -28,5 +30,6 @@ const EnvHostContextPath = "HOST_CONTEXT_PATH"
 const ConfigFileName = "compose.yml"
 
 const IngressVolumeName = "ingress"
+const SystemLogVolumeName = "tpc_system_log"
 const InitExitTimeOut = 60000
 const ContainerNamePrefix = "tpc_"

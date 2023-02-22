@@ -54,8 +54,12 @@ func (t *TestCompose) Start(ctx context.Context, autoStart bool) error {
 	if err := t.verify(ctx); err != nil {
 		return err
 	}
-	// first prepare Network and Volumes
+	// first prepare Network and Log Volumes
 	err := t.compose.PrepareNetwork(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = t.compose.CreateSystemLogVolume(ctx)
 	if err != nil {
 		return err
 	}

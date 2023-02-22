@@ -97,9 +97,11 @@ func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
+	agentMounts = append(agentMounts, docker.VolumeMount(common.SystemLogVolumeName+"_"+a.GetSessionId(), common.AgentLogPath))
+	containerName := common.ContainerNamePrefix + "agent_" + a.composeProvider.GetSessionId()
 	return a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
 		Image:        common.ImageAgent,
-		Name:         common.ContainerNamePrefix + "agent_" + a.composeProvider.GetSessionId(),
+		Name:         containerName,
 		ExposedPorts: []string{common.ServerAgentPort, common.ServerAgentEventBusPort},
 		Mounts:       agentMounts,
 		WaitingFor: wait.ForHTTP(common.EndPointAgentHealth).
@@ -109,6 +111,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 			common.TpcDebug:           os.Getenv(common.TpcDebug),
+			common.TpcName:            containerName,
 		},
 		Networks: []string{a.composeProvider.GetDockerProvider().GetDefaultNetwork(), a.composeProvider.GetConfig().GetNetworkName()},
 		NetworkAliases: map[string][]string{
@@ -126,13 +129,14 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context) error {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
-
+	agentMounts = append(agentMounts, docker.VolumeMount(common.SystemLogVolumeName+"_"+a.GetSessionId(), common.AgentLogPath))
 	cmd := make([]string, 0)
 	cmd = append(cmd, "prepareVolume")
 	for _, volume := range a.composeProvider.GetConfig().Volumes {
 		volumeId := volume.Name + "_" + a.composeProvider.GetSessionId()
 		agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
 	}
+	containerName := common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.ImageAgent,
 		Name:  common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId(),
@@ -140,6 +144,7 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context) error {
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 			common.TpcDebug:           os.Getenv(common.TpcDebug),
+			common.TpcName:            containerName,
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -152,7 +157,7 @@ func (a *Agent) StartAgentForSetVolumeGroup(ctx context.Context, selectGroupInde
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
-
+	agentMounts = append(agentMounts, docker.VolumeMount(common.SystemLogVolumeName+"_"+a.GetSessionId(), common.AgentLogPath))
 	cmd := make([]string, 0)
 	cmd = append(cmd, "prepareVolumeGroup")
 	cmd = append(cmd, "-s")
@@ -161,13 +166,15 @@ func (a *Agent) StartAgentForSetVolumeGroup(ctx context.Context, selectGroupInde
 		volumeId := volume.Name + "_" + a.composeProvider.GetSessionId()
 		agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
 	}
+	containerName := common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.ImageAgent,
-		Name:  common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId(),
+		Name:  containerName,
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 			common.TpcDebug:           os.Getenv(common.TpcDebug),
+			common.TpcName:            containerName,
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -178,13 +185,15 @@ func (a *Agent) StartAgentForSetVolumeGroup(ctx context.Context, selectGroupInde
 }
 
 func (a *Agent) StartAgentForClean(ctx context.Context) error {
+	containerName := common.ContainerNamePrefix + "agent_clean_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image:  common.ImageAgent,
 		Mounts: docker.Mounts(docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock")),
-		Name:   common.ContainerNamePrefix + "agent_clean_" + a.composeProvider.GetSessionId(),
+		Name:   containerName,
 		Env: map[string]string{
 			common.LabelSessionID: a.composeProvider.GetSessionId(),
 			common.TpcDebug:       os.Getenv(common.TpcDebug),
+			common.TpcName:        containerName,
 		},
 		Cmd: []string{"clean"},
 		Labels: map[string]string{
@@ -198,18 +207,20 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectGroupIndex in
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
-
+	agentMounts = append(agentMounts, docker.VolumeMount(common.SystemLogVolumeName+"_"+a.GetSessionId(), common.AgentLogPath))
 	cmd := make([]string, 0)
 	cmd = append(cmd, "switch")
 	cmd = append(cmd, "-s")
 	cmd = append(cmd, strconv.Itoa(selectGroupIndex))
+	containerName := common.ContainerNamePrefix + "agent_switch_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.ImageAgent,
-		Name:  common.ContainerNamePrefix + "agent_switch_" + a.composeProvider.GetSessionId(),
+		Name:  containerName,
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 			common.TpcDebug:           os.Getenv(common.TpcDebug),
+			common.TpcName:            containerName,
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -222,12 +233,14 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeId stri
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(filepath.Join(common.AgentVolumePath, common.IngressVolumeName))))
+	agentMounts = append(agentMounts, docker.VolumeMount(common.SystemLogVolumeName+"_"+a.GetSessionId(), common.AgentLogPath))
 	cmd := make([]string, 0)
 	cmd = append(cmd, "prepareIngressVolume")
 	for serviceName, portMapping := range servicePortInfo {
 		cmd = append(cmd, "-p")
 		cmd = append(cmd, serviceName+"="+portMapping)
 	}
+	containerName := common.ContainerNamePrefix + "agent_ingress_volume" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
 		Image: common.ImageAgent,
 		Name:  common.ContainerNamePrefix + "agent_ingress_volume" + a.composeProvider.GetSessionId(),
@@ -235,6 +248,7 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeId stri
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 			common.TpcDebug:           os.Getenv(common.TpcDebug),
+			common.TpcName:            containerName,
 		},
 		Mounts: agentMounts,
 		Cmd:    cmd,
@@ -277,6 +291,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		Mounts: docker.Mounts(docker.VolumeMount(volumeId, "/etc/envoy")),
 		Env: map[string]string{
 			common.TpcDebug: os.Getenv(common.TpcDebug),
+			common.TpcName:  containerName,
 		},
 		ExposedPorts: exposePorts,
 		Labels: map[string]string{
@@ -287,7 +302,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 	if err != nil {
 		return nil, err
 	}
-	collectLogs(&containerName, container)
+	collectLogs(container)
 	return container, nil
 }
 
@@ -298,7 +313,6 @@ func (a *Agent) runAndGetAgentError(ctx context.Context, containerRequest docker
 	if err != nil {
 		return err
 	}
-	collectLogs(&containerRequest.Name, container)
 	if err := container.Start(ctx, containerRequest); err != nil {
 		return err
 	}

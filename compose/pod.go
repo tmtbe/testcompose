@@ -178,6 +178,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		containers = append(containers, createContainer)
 	}
 	for _, c := range containers {
+		collectLogs(c)
 		p.observe.observeContainerId(c.GetContainerID())
 	}
 	event.Publish(ctx, &event.PodEventData{

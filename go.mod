@@ -23,13 +23,16 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-require github.com/gosuri/uitable v0.0.4
+require (
+	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef
+	github.com/gosuri/uitable v0.0.4
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+)
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Microsoft/go-winio v0.4.17 // indirect
 	github.com/Microsoft/hcsshim v0.8.23 // indirect
-	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef // indirect
 	github.com/containerd/cgroups v1.0.1 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect

@@ -11,6 +11,7 @@ import (
 
 func main() {
 	InitLogger()
+	zap.L().Info("Start agent")
 	sessionId := os.Getenv(common.LabelSessionID)
 	hostContextPath := os.Getenv(common.EnvHostContextPath)
 	runner, err := NewStarter(common.AgentContextPath, sessionId, hostContextPath)
