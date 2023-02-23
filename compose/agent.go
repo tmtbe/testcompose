@@ -121,7 +121,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeServer,
 		},
-		AutoRemove: true,
+		AutoRemove: false,
 	}, a.composeProvider.GetSessionId())
 }
 

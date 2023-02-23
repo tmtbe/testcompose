@@ -2,8 +2,10 @@ version: 1
 volumes:
   - name: collector
   - name: test
-trigger:
-  runTest:
+taskGroups:
+  - name: testrunner
+    event: system_event_start_success
+    tasks:
     - name: do-curl1
       image: alpine/curl
       command:
@@ -14,6 +16,9 @@ trigger:
       command:
         - curl
         - "demo/inbound"
+  - name: collect
+    event: system_event_trigger:testrunner
+    tasks:
     - name: do-import-jaeger
       image: alpine/curl
       command:
@@ -21,6 +26,9 @@ trigger:
         - --request
         - POST
         - "collector/import"
+  - name: gen-mock
+    event: system_event_trigger:collect
+    tasks:
     - name: do-create-mock
       image: testmesh/mockserver
       volumeMounts:
@@ -32,7 +40,10 @@ trigger:
         - /home/dump.json
         - -o
         - /home
-    - name: do-copy-gen
+  - name: copy
+    event: system_event_trigger:gen-mock
+    tasks:
+    - name: do-copy
       image: ubuntu
       volumeMounts:
         - name: collector

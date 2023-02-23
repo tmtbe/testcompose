@@ -19,12 +19,15 @@ func StartEventBusServer() error {
 }
 
 const Compose string = "compose"
-const ComposeEventStartType = "start"
-const ComposeEventStartSuccessType = "start_success"
-const ComposeEventStartFailType = "start_fail"
-const ComposeEventRestartType = "restart"
-const ComposeEventRestartSuccessType = "restart_success"
-const ComposeEventRestartFailType = "restart_fail"
+const ComposeEventBeforeStartType = "system_event_before_start"
+const ComposeEventStartSuccessType = "system_event_start_success"
+const ComposeEventStartFailType = "system_event_start_fail"
+const ComposeEventBeforeRestartType = "system_event_before_restart"
+const ComposeEventRestartSuccessType = "system_event_restart_success"
+const ComposeEventRestartFailType = "system_event_restart_fail"
+const ComposeEventBeforeStopType = "system_event_before_stop"
+const ComposeEventAfterStopType = "system_event_after_stop"
+const ComposeEventTriggerFinishTask = "system_event_trigger"
 
 const Pod string = "pod"
 const PodEventStartType = "start"
@@ -55,6 +58,12 @@ func (t *TracingData) MergeTracingData(data TracingData) {
 }
 
 func Publish(ctx context.Context, event Event) {
+	go func() {
+		err := event.Do()
+		if err != nil {
+			zap.L().Sugar().Errorf("event %s do error %s", event.ToJson(), err)
+		}
+	}()
 	if Bus == nil {
 		return
 	}
@@ -65,7 +74,7 @@ func Publish(ctx context.Context, event Event) {
 	event.SetEventTime(time.Now())
 	eventJson := event.ToJson()
 	Bus.Publish(event.Topic(), eventJson)
-	zap.L().Sugar().Debug("event", eventJson)
+	zap.L().Sugar().Debugf("event[%s]: %s", event.Topic(), eventJson)
 }
 
 type Event interface {
@@ -73,6 +82,7 @@ type Event interface {
 	MergeTracingData(tracingData TracingData)
 	ToJson() string
 	Topic() string
+	Do() error
 }
 
 type PodEventData struct {
@@ -93,6 +103,10 @@ func (p *PodEventData) ToJson() string {
 
 func (p *PodEventData) Topic() string {
 	return Pod
+}
+
+func (p *PodEventData) Do() error {
+	return nil
 }
 
 type ContainerEventData struct {
@@ -118,10 +132,15 @@ func (c *ContainerEventData) Topic() string {
 	return Container
 }
 
+func (c *ContainerEventData) Do() error {
+	return nil
+}
+
 type ComposeEventData struct {
 	TracingData
 	Type      string
 	EventTime time.Time
+	Trigger   func(ctx context.Context, name string) error `json:"-"`
 }
 
 func (c *ComposeEventData) SetEventTime(eventTime time.Time) {
@@ -135,4 +154,11 @@ func (c *ComposeEventData) ToJson() string {
 
 func (c *ComposeEventData) Topic() string {
 	return Compose
+}
+
+func (c *ComposeEventData) Do() error {
+	if c.Trigger == nil {
+		return nil
+	}
+	return c.Trigger(context.Background(), c.Type)
 }

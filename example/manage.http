@@ -5,7 +5,7 @@ Content-Type: text/plain
 
 ###
 
-POST http://localhost:{{port}}/trigger
+POST http://localhost:{{port}}/taskGroup
 Content-Type: text/plain
 
 {"name":"runTest"}

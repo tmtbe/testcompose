@@ -74,19 +74,11 @@ func (s *Starter) start() error {
 			return err
 		}
 	}
-	err = s.compose.StartSystemTriggerStart(ctx)
-	if err != nil {
-		return err
-	}
 	return s.compose.StartPods(ctx)
 }
 func (s *Starter) stop() error {
 	if s.compose.IsReady() {
 		ctx := context.Background()
-		err := s.compose.StartSystemTriggerStop(ctx)
-		if err != nil {
-			return err
-		}
 		s.compose.StopPods(ctx)
 		s.isStarted = false
 	} else {

@@ -73,22 +73,22 @@ func (a *Api) GetRoute() *gin.Engine {
 			"message": "shutdown",
 		})
 	})
-	router.POST(common.EndPointAgentTrigger, func(c *gin.Context) {
+	router.POST(common.EndPointAgentTaskGroup, func(c *gin.Context) {
 		ctx := context.Background()
-		type TriggerBody struct {
+		type TaskGroupBody struct {
 			Name string
 		}
-		var triggerBody TriggerBody
-		err := c.BindJSON(&triggerBody)
+		var taskGroupBody TaskGroupBody
+		err := c.BindJSON(&taskGroupBody)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": err.Error(),
 			})
 		}
-		err = a.compose.StartUserTrigger(ctx, triggerBody.Name)
+		err = a.compose.StartUserTrigger(ctx, taskGroupBody.Name)
 		if err == nil {
 			c.JSON(http.StatusOK, gin.H{
-				"message": "trigger success",
+				"message": "run task success",
 			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{

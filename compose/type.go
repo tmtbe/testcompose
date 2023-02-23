@@ -8,13 +8,37 @@ import (
 )
 
 type ComposeConfig struct {
-	Version      string                        `json:"version" yaml:"version"`
-	SessionId    string                        `json:"sessionId" yaml:"sessionId"`
-	Network      string                        `json:"network" yaml:"network"`
-	Trigger      map[string][]*ContainerConfig `json:"trigger" yaml:"trigger"`
-	Pods         []*PodConfig                  `json:"pods" yaml:"pods"`
-	VolumeGroups VolumeGroupConfigs            `json:"volumeGroups" yaml:"volumeGroups"`
-	Volumes      []*VolumeConfig               `json:"volumes" yaml:"volumes"`
+	Version      string             `json:"version" yaml:"version"`
+	SessionId    string             `json:"sessionId" yaml:"sessionId"`
+	Network      string             `json:"network" yaml:"network"`
+	TaskGroups   TaskGroups         `json:"taskGroups" yaml:"taskGroups"`
+	Pods         []*PodConfig       `json:"pods" yaml:"pods"`
+	VolumeGroups VolumeGroupConfigs `json:"volumeGroups" yaml:"volumeGroups"`
+	Volumes      []*VolumeConfig    `json:"volumes" yaml:"volumes"`
+}
+type TaskGroups []*TaskGroup
+type TaskGroup struct {
+	Name  string             `json:"name" yaml:"name"`
+	Event string             `json:"event" yaml:"event"`
+	Tasks []*ContainerConfig `json:"tasks" yaml:"tasks"`
+}
+
+func (t TaskGroups) GetTaskGroupFromName(name string) *TaskGroup {
+	for _, taskGroup := range t {
+		if taskGroup.Name == name {
+			return taskGroup
+		}
+	}
+	return nil
+}
+func (t TaskGroups) GetTaskGroupFromEvent(event string) []*TaskGroup {
+	result := make([]*TaskGroup, 0)
+	for _, taskGroup := range t {
+		if taskGroup.Event == event {
+			result = append(result, taskGroup)
+		}
+	}
+	return result
 }
 
 func (c *ComposeConfig) GetNetworkName() string {
@@ -32,8 +56,15 @@ func (c *ComposeConfig) check(contextPath string) error {
 	if c.SessionId == "" {
 		return errors.New("not init session id")
 	}
-	podMap := make(map[string]string)
 	needVolumeMap := make(map[string]string)
+	for _, taskGroup := range c.TaskGroups {
+		for _, task := range taskGroup.Tasks {
+			for _, vm := range task.VolumeMounts {
+				needVolumeMap[vm.Name] = vm.Name
+			}
+		}
+	}
+	podMap := make(map[string]string)
 	for _, pod := range c.Pods {
 		if _, ok := podMap[pod.Name]; ok {
 			return errors.Errorf("duplicate pod name:%s", pod.Name)
@@ -161,7 +192,6 @@ func (p *PodConfig) check(cc *ComposeConfig) error {
 type ContainerConfig struct {
 	Name            string               `json:"name" yaml:"name"`
 	Image           string               `json:"image" yaml:"image"`
-	Ports           []int                `json:"ports" yaml:"ports"`
 	Privileged      bool                 `json:"privileged" yaml:"privileged"`
 	AlwaysPullImage bool                 `json:"alwaysPullImage" yaml:"alwaysPullImage"`
 	VolumeMounts    []*VolumeMountConfig `json:"volumeMounts" yaml:"volumeMounts"`

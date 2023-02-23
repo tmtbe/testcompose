@@ -5,7 +5,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"os"
 	"path/filepath"
 	"podcompose/common"
 	"podcompose/docker"
@@ -34,7 +33,7 @@ func collectLogs(container docker.Container) {
 		MaxAge:     30,                                               //日志文件保留天数
 		Compress:   false,                                            //是否压缩处理
 	})
-	core := zapcore.NewCore(zapcore.NewConsoleEncoder(encoder()), zapcore.NewMultiWriteSyncer(fileWriteSyncer, zapcore.AddSync(os.Stdout)), zap.InfoLevel)
+	core := zapcore.NewCore(zapcore.NewConsoleEncoder(encoder()), fileWriteSyncer, zap.InfoLevel)
 	logger := zap.New(core)
 	container.FollowOutput(&AgentLog{
 		Name:   cname,
