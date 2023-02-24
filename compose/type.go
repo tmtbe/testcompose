@@ -2,25 +2,26 @@ package compose
 
 import (
 	"fmt"
+	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
 )
 
 type ComposeConfig struct {
-	Version      string             `json:"version" yaml:"version"`
-	SessionId    string             `json:"sessionId" yaml:"sessionId"`
-	Network      string             `json:"network" yaml:"network"`
-	TaskGroups   TaskGroups         `json:"taskGroups" yaml:"taskGroups"`
-	Pods         []*PodConfig       `json:"pods" yaml:"pods"`
-	VolumeGroups VolumeGroupConfigs `json:"volumeGroups" yaml:"volumeGroups"`
-	Volumes      []*VolumeConfig    `json:"volumes" yaml:"volumes"`
+	Version      string             `json:"version" yaml:"version" validate:"required"`
+	SessionId    string             `json:"sessionId,omitempty" yaml:"sessionId,omitempty"`
+	Network      string             `json:"network,omitempty" yaml:"network,omitempty"`
+	TaskGroups   TaskGroups         `json:"taskGroups,omitempty" yaml:"taskGroups,omitempty" validate:"omitempty,dive"`
+	Pods         []*PodConfig       `json:"pods,omitempty" yaml:"pods,omitempty" validate:"omitempty,dive"`
+	VolumeGroups VolumeGroupConfigs `json:"volumeGroups,omitempty" yaml:"volumeGroups,omitempty" validate:"omitempty,dive"`
+	Volumes      []*VolumeConfig    `json:"volumes,omitempty" yaml:"volumes,omitempty" validate:"omitempty,dive"`
 }
 type TaskGroups []*TaskGroup
 type TaskGroup struct {
-	Name  string             `json:"name" yaml:"name"`
+	Name  string             `json:"name" yaml:"name" validate:"required"`
 	Event string             `json:"event" yaml:"event"`
-	Tasks []*ContainerConfig `json:"tasks" yaml:"tasks"`
+	Tasks []*ContainerConfig `json:"tasks" yaml:"tasks" validate:"omitempty,dive"`
 }
 
 func (t TaskGroups) GetTaskGroupFromName(name string) *TaskGroup {
@@ -50,6 +51,11 @@ func (c *ComposeConfig) GetNetworkName() string {
 }
 
 func (c *ComposeConfig) check(contextPath string) error {
+	validate := validator.New()
+	err := validate.Struct(c)
+	if err != nil {
+		return err
+	}
 	if c.Version != "1" {
 		return errors.New("version must be 1")
 	}
@@ -129,12 +135,12 @@ func (v VolumeGroupConfigs) GetGroup(name string) (*VolumeGroupConfig, int) {
 }
 
 type VolumeGroupConfig struct {
-	Name    string          `json:"name" yaml:"name"`
-	Volumes []*VolumeConfig `json:"volumes"`
+	Name    string          `json:"name" yaml:"name" validate:"required"`
+	Volumes []*VolumeConfig `json:"volumes" validate:"omitempty,dive"`
 }
 
 type VolumeConfig struct {
-	Name string `json:"name" yaml:"name"`
+	Name string `json:"name" yaml:"name" validate:"required"`
 	Path string `json:"path" yaml:"path"`
 }
 
@@ -153,11 +159,11 @@ func (v *VolumeConfig) check(contextPath string) error {
 }
 
 type PodConfig struct {
-	Name           string             `json:"name" yaml:"name"`
-	InitContainers []*ContainerConfig `json:"initContainers" yaml:"initContainers"`
-	Dns            []string           `json:"dns" yaml:"dns"`
-	Containers     []*ContainerConfig `json:"containers" yaml:"containers"`
-	Depends        []string           `json:"depends" yaml:"depends"`
+	Name           string             `json:"name" yaml:"name" validate:"required"`
+	InitContainers []*ContainerConfig `json:"initContainers,omitempty" yaml:"initContainers,omitempty" validate:"omitempty,dive"`
+	Dns            []string           `json:"dns,omitempty" yaml:"dns,omitempty"`
+	Containers     []*ContainerConfig `json:"containers" yaml:"containers" validate:"omitempty,dive"`
+	Depends        []string           `json:"depends,omitempty" yaml:"depends,omitempty"`
 }
 
 func (p *PodConfig) check(cc *ComposeConfig) error {
@@ -190,18 +196,18 @@ func (p *PodConfig) check(cc *ComposeConfig) error {
 }
 
 type ContainerConfig struct {
-	Name            string               `json:"name" yaml:"name"`
-	Image           string               `json:"image" yaml:"image"`
-	Privileged      bool                 `json:"privileged" yaml:"privileged"`
-	AlwaysPullImage bool                 `json:"alwaysPullImage" yaml:"alwaysPullImage"`
-	VolumeMounts    []*VolumeMountConfig `json:"volumeMounts" yaml:"volumeMounts"`
-	BindMounts      []*BindMountConfig   `json:"bindMounts" yaml:"bindMounts"`
-	Env             map[string]string    `json:"env" yaml:"env"`
-	Command         []string             `json:"command" yaml:"command"`
-	Cap             *CapConfig           `json:"cap" yaml:"cap"`
-	WaitingFor      *WaitingForConfig    `json:"waitingFor" yaml:"waitingFor"`
-	User            string               `json:"user" yaml:"user"`
-	WorkingDir      string               `json:"workingDir" yaml:"workingDir"`
+	Name            string               `json:"name" yaml:"name" validate:"required"`
+	Image           string               `json:"image" yaml:"image" validate:"required"`
+	Privileged      bool                 `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	AlwaysPullImage bool                 `json:"alwaysPullImage,omitempty" yaml:"alwaysPullImage,omitempty"`
+	BindMounts      []*BindMountConfig   `json:"bindMounts,omitempty" yaml:"bindMounts,omitempty" validate:"omitempty,dive"`
+	VolumeMounts    []*VolumeMountConfig `json:"volumeMounts,omitempty" yaml:"volumeMounts,omitempty" validate:"omitempty,dive"`
+	Env             map[string]string    `json:"env,omitempty" yaml:"env,omitempty"`
+	Command         []string             `json:"command,omitempty" yaml:"command,omitempty"`
+	Cap             *CapConfig           `json:"cap,omitempty" yaml:"cap,omitempty"`
+	WaitingFor      *WaitingForConfig    `json:"waitingFor,omitempty" yaml:"waitingFor,omitempty" validate:"omitempty,dive"`
+	User            string               `json:"user,omitempty" yaml:"user,omitempty"`
+	WorkingDir      string               `json:"workingDir,omitempty" yaml:"workingDir,omitempty"`
 }
 
 func (cc *ContainerConfig) check(c *ComposeConfig) error {
@@ -212,26 +218,22 @@ func (cc *ContainerConfig) check(c *ComposeConfig) error {
 }
 
 type VolumeMountConfig struct {
-	Name      string `json:"name" yaml:"name"`
-	MountPath string `json:"mountPath" yaml:"mountPath"`
+	Name      string `json:"name" yaml:"name" validate:"required"`
+	MountPath string `json:"mountPath" yaml:"mountPath" validate:"required"`
 }
 
 type BindMountConfig struct {
-	HostPath  string `json:"hostPath" yaml:"hostPath"`
-	MountPath string `json:"mountPath" yaml:"mountPath"`
+	HostPath  string `json:"hostPath" yaml:"hostPath" validate:"required"`
+	MountPath string `json:"mountPath" yaml:"mountPath" validate:"required"`
 }
 
-type EnvConfig struct {
-	Name  string `json:"name" yaml:"name"`
-	Value string `json:"value" yaml:"value"`
-}
 type CapConfig struct {
 	Add  []string `json:"add" yaml:"add"`
 	Drop []string `json:"drop" yaml:"drop"`
 }
 type WaitingForConfig struct {
-	HttpGet             *HttpGetConfig   `json:"httpGet" json:"httpGet"`
-	TcpSocket           *TcpSocketConfig `json:"tcpSocket" json:"tcpSocket"`
+	HttpGet             *HttpGetConfig   `json:"httpGet" json:"httpGet" validate:"omitempty,dive"`
+	TcpSocket           *TcpSocketConfig `json:"tcpSocket" json:"tcpSocket" validate:"omitempty,dive"`
 	InitialDelaySeconds int              `json:"initialDelaySeconds" yaml:"initialDelaySeconds"`
 	PeriodSeconds       int              `json:"periodSeconds" yaml:"periodSeconds"`
 }
@@ -247,10 +249,10 @@ func (wf *WaitingForConfig) check() error {
 }
 
 type HttpGetConfig struct {
-	Method string `json:"method" yaml:"method"`
-	Path   string `json:"path" yaml:"path"`
-	Port   int    `json:"port" yaml:"port"`
+	Method string `json:"method" yaml:"method" validate:"required"`
+	Path   string `json:"path" yaml:"path" validate:"required"`
+	Port   int    `json:"port" yaml:"port" validate:"required"`
 }
 type TcpSocketConfig struct {
-	Port int `json:"port" yaml:"port"`
+	Port int `json:"port" yaml:"port" validate:"required"`
 }
