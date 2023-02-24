@@ -29,6 +29,8 @@ const ComposeEventBeforeStopType = "system_event_before_stop"
 const ComposeEventAfterStopType = "system_event_after_stop"
 const ComposeEventTriggerFinishTask = "system_event_trigger"
 
+const Error string = "error"
+
 const Pod string = "pod"
 const PodEventStartType = "start"
 const PodEventReadyType = "ready"
@@ -161,4 +163,31 @@ func (c *ComposeEventData) Do() error {
 		return nil
 	}
 	return c.Trigger(context.Background(), c.Type)
+}
+
+type ErrorData struct {
+	EventTime time.Time
+	Reason    string
+	Message   string
+}
+
+func (c *ErrorData) MergeTracingData(tracingData TracingData) {
+	return
+}
+
+func (c *ErrorData) SetEventTime(eventTime time.Time) {
+	c.EventTime = eventTime
+}
+
+func (c *ErrorData) ToJson() string {
+	jsonByte, _ := json.Marshal(c)
+	return string(jsonByte)
+}
+
+func (c *ErrorData) Topic() string {
+	return Error
+}
+
+func (c *ErrorData) Do() error {
+	return nil
 }

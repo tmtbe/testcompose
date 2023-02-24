@@ -203,6 +203,10 @@ func (c *Compose) SystemAutoTrigger(ctx context.Context, eventName string) error
 			event.Publish(ctx, &eventData)
 			if err != nil {
 				zap.L().Sugar().Error("SystemAutoTrigger Error: ", err)
+				event.Publish(ctx, &event.ErrorData{
+					Reason:  "SystemAutoTrigger Error",
+					Message: err.Error(),
+				})
 			}
 		}()
 	}

@@ -8,28 +8,6 @@ volumeGroups:
     volumes:
       - name: { name }
         path: { path }
-trigger:
-  { start }:
-    - name: { container_name }
-      privileged: { bool }
-      alwaysPullImage: { bool }
-      user: { user }
-      volumeMounts:
-        - name: workdir
-          mountPath: "/work-dir"
-      bindMounts:
-        - hostPath: "/home"
-          mountPath: "/work-dir"
-      workingDir: /home
-      env:
-        "xxx":"xxx"
-      command:
-        - { command }
-      cap:
-        add:
-          - { CAP }
-        drop:
-          - { CAP }
 pods:
   - name: { pod_name }
     depends:

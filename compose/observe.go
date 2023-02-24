@@ -2,6 +2,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"go.uber.org/zap"
 	"podcompose/common"
 	"podcompose/docker"
@@ -40,6 +41,12 @@ func (o *Observe) Start(provider *docker.DockerProvider) {
 				}
 				if !o.isRepeat(eventData) {
 					event.Publish(ctx, &eventData)
+				}
+				if inspect.State.Running == false && inspect.State.ExitCode != 0 {
+					event.Publish(ctx, &event.ErrorData{
+						Reason:  "Error exit code",
+						Message: fmt.Sprintf("Pod [%s] Container [%s] is dead and exit code is not 0", inspect.Config.Labels[common.LabelPodName], inspect.Config.Labels[common.LabelContainerName]),
+					})
 				}
 			}
 			time.Sleep(time.Second)
