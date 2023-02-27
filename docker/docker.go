@@ -176,40 +176,34 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 			pullOpt.RegistryAuth = req.RegistryCred
 		}
 
-		event.Publish(ctx, &event.ContainerEventData{
-			TracingData: event.TracingData{
-				PodName:       req.Labels[common.LabelPodName],
-				ContainerName: req.Labels[common.LabelContainerName],
-			},
-			Type:  event.ContainerEventPullStartType,
-			Id:    "",
-			Name:  req.Name,
-			Image: req.Image,
+		event.Publish(&event.ContainerEventData{
+			PodName:       req.Labels[common.LabelPodName],
+			ContainerName: req.Labels[common.LabelContainerName],
+			Type:          event.ContainerEventPullStartType,
+			Id:            "",
+			Name:          req.Name,
+			Image:         req.Image,
 		})
 
 		if err := p.attemptToPullImage(ctx, tag, pullOpt); err != nil {
-			event.Publish(ctx, &event.ContainerEventData{
-				TracingData: event.TracingData{
-					PodName:       req.Labels[common.LabelPodName],
-					ContainerName: req.Labels[common.LabelContainerName],
-				},
-				Type:  event.ContainerEventPullFailType,
-				Id:    "",
-				Name:  req.Name,
-				Image: req.Image,
+			event.Publish(&event.ContainerEventData{
+				PodName:       req.Labels[common.LabelPodName],
+				ContainerName: req.Labels[common.LabelContainerName],
+				Type:          event.ContainerEventPullFailType,
+				Id:            "",
+				Name:          req.Name,
+				Image:         req.Image,
 			})
 			return nil, err
 		}
 
-		event.Publish(ctx, &event.ContainerEventData{
-			TracingData: event.TracingData{
-				PodName:       req.Labels[common.LabelPodName],
-				ContainerName: req.Labels[common.LabelContainerName],
-			},
-			Type:  event.ContainerEventPullSuccessType,
-			Id:    "",
-			Name:  req.Name,
-			Image: req.Image,
+		event.Publish(&event.ContainerEventData{
+			PodName:       req.Labels[common.LabelPodName],
+			ContainerName: req.Labels[common.LabelContainerName],
+			Type:          event.ContainerEventPullSuccessType,
+			Id:            "",
+			Name:          req.Name,
+			Image:         req.Image,
 		})
 	}
 
@@ -298,15 +292,13 @@ func (p *DockerProvider) CreateContainer(ctx context.Context, req ContainerReque
 		stopProducer:      make(chan bool),
 		logger:            Logger,
 	}
-	event.Publish(ctx, &event.ContainerEventData{
-		TracingData: event.TracingData{
-			PodName:       req.Labels[common.LabelPodName],
-			ContainerName: req.Labels[common.LabelContainerName],
-		},
-		Type:  event.ContainerEventCreatedType,
-		Id:    c.ID,
-		Name:  req.Name,
-		Image: req.Image,
+	event.Publish(&event.ContainerEventData{
+		PodName:       req.Labels[common.LabelPodName],
+		ContainerName: req.Labels[common.LabelContainerName],
+		Type:          event.ContainerEventCreatedType,
+		Id:            c.ID,
+		Name:          req.Name,
+		Image:         req.Image,
 	})
 	return c, nil
 }
@@ -566,15 +558,13 @@ func (p *DockerProvider) RemoveContainer(ctx context.Context, id string) error {
 	zap.L().Sugar().Debugf("remove container : %s", id)
 	inspect, err := p.ContainerInspect(ctx, id)
 	if err == nil {
-		event.Publish(ctx, &event.ContainerEventData{
-			TracingData: event.TracingData{
-				PodName:       inspect.Config.Labels[common.LabelPodName],
-				ContainerName: inspect.Config.Labels[common.LabelContainerName],
-			},
-			Type:  event.ContainerEventRemoveType,
-			Id:    inspect.ID,
-			Name:  inspect.Name,
-			Image: inspect.Image,
+		event.Publish(&event.ContainerEventData{
+			PodName:       inspect.Config.Labels[common.LabelPodName],
+			ContainerName: inspect.Config.Labels[common.LabelContainerName],
+			Type:          event.ContainerEventRemoveType,
+			Id:            inspect.ID,
+			Name:          inspect.Name,
+			Image:         inspect.Image,
 		})
 	}
 	return p.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
@@ -881,15 +871,13 @@ func (c *DockerContainer) SessionID() string {
 
 // Start will start an already created container
 func (c *DockerContainer) Start(ctx context.Context, req ContainerRequest) error {
-	event.Publish(ctx, &event.ContainerEventData{
-		TracingData: event.TracingData{
-			PodName:       req.Labels[common.LabelPodName],
-			ContainerName: req.Labels[common.LabelContainerName],
-		},
-		Name:  req.Name,
-		Image: req.Image,
-		Type:  event.ContainerEventStartType,
-		Id:    c.ID,
+	event.Publish(&event.ContainerEventData{
+		PodName:       req.Labels[common.LabelPodName],
+		ContainerName: req.Labels[common.LabelContainerName],
+		Name:          req.Name,
+		Image:         req.Image,
+		Type:          event.ContainerEventStartType,
+		Id:            c.ID,
 	})
 	shortID := c.ID[:12]
 	c.logger.Printf("Starting container id: %s image: %s", shortID, c.Image)
@@ -908,27 +896,23 @@ func (c *DockerContainer) Start(ctx context.Context, req ContainerRequest) error
 	state, err := c.State(ctx)
 	if err != nil || state.Running == false {
 		c.logger.Printf("Container is removed id: %s image: %s", shortID, c.Image)
-		event.Publish(ctx, &event.ContainerEventData{
-			TracingData: event.TracingData{
-				PodName:       req.Labels[common.LabelPodName],
-				ContainerName: req.Labels[common.LabelContainerName],
-			},
-			Name:  req.Name,
-			Type:  event.ContainerEventRemoveType,
-			Id:    c.ID,
-			Image: c.Image,
+		event.Publish(&event.ContainerEventData{
+			PodName:       req.Labels[common.LabelPodName],
+			ContainerName: req.Labels[common.LabelContainerName],
+			Name:          req.Name,
+			Type:          event.ContainerEventRemoveType,
+			Id:            c.ID,
+			Image:         c.Image,
 		})
 	} else {
 		c.logger.Printf("Container is ready id: %s image: %s", shortID, c.Image)
-		event.Publish(ctx, &event.ContainerEventData{
-			TracingData: event.TracingData{
-				PodName:       req.Labels[common.LabelPodName],
-				ContainerName: req.Labels[common.LabelContainerName],
-			},
-			Name:  req.Name,
-			Type:  event.ContainerEventReadyType,
-			Id:    c.ID,
-			Image: c.Image,
+		event.Publish(&event.ContainerEventData{
+			PodName:       req.Labels[common.LabelPodName],
+			ContainerName: req.Labels[common.LabelContainerName],
+			Name:          req.Name,
+			Type:          event.ContainerEventReadyType,
+			Id:            c.ID,
+			Image:         c.Image,
 		})
 	}
 	return nil

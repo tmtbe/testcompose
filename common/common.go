@@ -20,7 +20,6 @@ const EndPointAgentIngress = "/ingress"
 const EndPointAgentInfo = "/info"
 const ServerAgentPort = "80"
 const ServerAgentEventBusPort = "7070"
-const ServerAgentEventBusPath = "/_server_bus_"
 
 const LabelSessionID = "SESSION_ID"
 const LabelPodName = "POD_NAME"

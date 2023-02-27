@@ -29,21 +29,19 @@ func (o *Observe) Start(provider *docker.DockerProvider) {
 					continue
 				}
 				eventData := event.ContainerEventData{
-					TracingData: event.TracingData{
-						PodName:       inspect.Config.Labels[common.LabelPodName],
-						ContainerName: inspect.Config.Labels[common.LabelContainerName],
-					},
-					Id:    id,
-					Name:  inspect.Name,
-					Image: inspect.Image,
-					Type:  event.ContainerEventStateType,
-					State: inspect.State,
+					PodName:       inspect.Config.Labels[common.LabelPodName],
+					ContainerName: inspect.Config.Labels[common.LabelContainerName],
+					Id:            id,
+					Name:          inspect.Name,
+					Image:         inspect.Image,
+					Type:          event.ContainerEventStateType,
+					State:         inspect.State,
 				}
 				if !o.isRepeat(eventData) {
-					event.Publish(ctx, &eventData)
+					event.Publish(&eventData)
 				}
 				if inspect.State.Running == false && inspect.State.ExitCode != 0 {
-					event.Publish(ctx, &event.ErrorData{
+					event.Publish(&event.ErrorData{
 						Reason:  "Error exit code",
 						Message: fmt.Sprintf("Pod [%s] Container [%s] is dead and exit code is not 0", inspect.Config.Labels[common.LabelPodName], inspect.Config.Labels[common.LabelContainerName]),
 					})

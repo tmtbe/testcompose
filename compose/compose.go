@@ -16,14 +16,15 @@ import (
 )
 
 type Compose struct {
-	podCompose      *PodCompose
-	config          *ComposeConfig
-	dockerProvider  *docker.DockerProvider
-	volume          *VolumeGroups
-	contextPath     string
-	hostContextPath string
-	ready           bool
-	triggerLock     sync.Mutex
+	podCompose              *PodCompose
+	config                  *ComposeConfig
+	dockerProvider          *docker.DockerProvider
+	volume                  *VolumeGroups
+	contextPath             string
+	hostContextPath         string
+	ready                   bool
+	triggerLock             sync.Mutex
+	taskGroupEventRunRecord map[string]bool
 }
 
 func NewCompose(configBytes []byte, sessionId string, contextPath string, hostContextPath string) (*Compose, error) {
@@ -52,13 +53,20 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string, hostCo
 	if err != nil {
 		return nil, err
 	}
+	taskGroupEventRunRecord := make(map[string]bool)
+	for _, taskGroup := range config.TaskGroups {
+		if taskGroup.Event != "" {
+			taskGroupEventRunRecord[taskGroup.Name] = false
+		}
+	}
 	return &Compose{
-		podCompose:      compose,
-		config:          &config,
-		dockerProvider:  provider,
-		volume:          NewVolumeGroups(config.VolumeGroups, provider),
-		contextPath:     contextPath,
-		hostContextPath: hostContextPath,
+		podCompose:              compose,
+		config:                  &config,
+		dockerProvider:          provider,
+		volume:                  NewVolumeGroups(config.VolumeGroups, provider),
+		contextPath:             contextPath,
+		hostContextPath:         hostContextPath,
+		taskGroupEventRunRecord: taskGroupEventRunRecord,
 	}, nil
 }
 
@@ -71,25 +79,25 @@ func genSessionId() string {
 func (c *Compose) StartPods(ctx context.Context) error {
 	eventData := event.ComposeEventData{
 		Type:    event.ComposeEventBeforeStartType,
-		Trigger: c.SystemAutoTrigger,
+		Trigger: c.SystemAutoTaskGroup,
 	}
-	event.Publish(ctx, &eventData)
+	event.Publish(&eventData)
 	zap.L().Info("Compose start running")
 	err := c.podCompose.start(ctx)
 	if err != nil {
 		eventData = event.ComposeEventData{
 			Type:    event.ComposeEventStartFailType,
-			Trigger: c.SystemAutoTrigger,
+			Trigger: c.SystemAutoTaskGroup,
 		}
 	} else {
 		c.ready = true
 		eventData = event.ComposeEventData{
 			Type:    event.ComposeEventStartSuccessType,
-			Trigger: c.SystemAutoTrigger,
+			Trigger: c.SystemAutoTaskGroup,
 		}
 		zap.L().Info("Compose is ready, all pods is started")
 	}
-	event.Publish(ctx, &eventData)
+	event.Publish(&eventData)
 	return err
 }
 
@@ -121,9 +129,9 @@ func (c *Compose) RestartPods(ctx context.Context, podNames []string, beforeStar
 	}
 	eventData := event.ComposeEventData{
 		Type:    event.ComposeEventBeforeRestartType,
-		Trigger: c.SystemAutoTrigger,
+		Trigger: c.SystemAutoTaskGroup,
 	}
-	event.Publish(ctx, &eventData)
+	event.Publish(&eventData)
 	zap.L().Info("Compose restart pods")
 	c.ready = false
 	err := c.podCompose.RestartPods(ctx, podNames, beforeStart)
@@ -131,16 +139,16 @@ func (c *Compose) RestartPods(ctx context.Context, podNames []string, beforeStar
 		c.ready = true
 		eventData = event.ComposeEventData{
 			Type:    event.ComposeEventRestartSuccessType,
-			Trigger: c.SystemAutoTrigger,
+			Trigger: c.SystemAutoTaskGroup,
 		}
 		zap.L().Info("Compose restart pods success")
 	} else {
 		eventData = event.ComposeEventData{
 			Type:    event.ComposeEventRestartFailType,
-			Trigger: c.SystemAutoTrigger,
+			Trigger: c.SystemAutoTaskGroup,
 		}
 	}
-	event.Publish(ctx, &eventData)
+	event.Publish(&eventData)
 	return err
 }
 
@@ -190,30 +198,43 @@ func (c *Compose) PrepareNetwork(ctx context.Context) error {
 	return nil
 }
 
-func (c *Compose) SystemAutoTrigger(ctx context.Context, eventName string) error {
+func (c *Compose) SystemAutoTaskGroup(ctx context.Context, eventName string) error {
 	taskGroups := c.config.TaskGroups.GetTaskGroupFromEvent(eventName)
 	for _, taskGroup := range taskGroups {
 		taskGroup := taskGroup
 		go func() {
-			err := c.podCompose.StartTrigger("system_trigger_"+taskGroup.Name, taskGroup.Tasks, ctx)
-			eventData := event.ComposeEventData{
-				Type:    event.ComposeEventTriggerFinishTask + ":" + taskGroup.Name,
-				Trigger: c.SystemAutoTrigger,
-			}
-			event.Publish(ctx, &eventData)
+			err := c.podCompose.StartTaskGroup("system_trigger_"+taskGroup.Name, taskGroup, ctx)
 			if err != nil {
-				zap.L().Sugar().Error("SystemAutoTrigger Error: ", err)
-				event.Publish(ctx, &event.ErrorData{
-					Reason:  "SystemAutoTrigger Error",
+				zap.L().Sugar().Error("SystemAutoTaskGroup Error: ", err)
+				event.Publish(&event.ErrorData{
+					Reason:  "SystemAutoTaskGroup Error",
 					Message: err.Error(),
 				})
+			} else {
+				event.Publish(&event.ComposeEventData{
+					Type:    event.ComposeEventTaskGroupSuccess + ":" + taskGroup.Name,
+					Trigger: c.SystemAutoTaskGroup,
+				})
+				c.taskGroupEventRunRecord[taskGroup.Name] = true
+				isFinish := true
+				for _, flag := range c.taskGroupEventRunRecord {
+					if flag == false {
+						isFinish = true
+						break
+					}
+				}
+				if isFinish {
+					event.Publish(&event.ComposeEventData{
+						Type: event.ComposeEventAutoTaskGroupAllFinish,
+					})
+				}
 			}
 		}()
 	}
 	return nil
 }
 
-func (c *Compose) StartUserTrigger(ctx context.Context, name string) error {
+func (c *Compose) StartUserTaskGroup(ctx context.Context, name string) error {
 	if !c.ready {
 		return errors.Errorf("compose is not ready, can not trigger task")
 	}
@@ -224,12 +245,12 @@ func (c *Compose) StartUserTrigger(ctx context.Context, name string) error {
 	c.triggerLock.Lock()
 	defer c.triggerLock.Unlock()
 	triggerName := "user_trigger_" + name
-	err := c.podCompose.StartTrigger(triggerName, taskGroup.Tasks, ctx)
+	err := c.podCompose.StartTaskGroup(triggerName, taskGroup, ctx)
 	eventData := event.ComposeEventData{
-		Type:    event.ComposeEventTriggerFinishTask + ":" + name,
-		Trigger: c.SystemAutoTrigger,
+		Type:    event.ComposeEventTaskGroupSuccess + ":" + name,
+		Trigger: c.SystemAutoTaskGroup,
 	}
-	event.Publish(ctx, &eventData)
+	event.Publish(&eventData)
 	return err
 }
 
@@ -237,9 +258,9 @@ func (c *Compose) StopPods(ctx context.Context) {
 	c.ready = false
 	eventData := event.ComposeEventData{
 		Type:    event.ComposeEventBeforeStopType,
-		Trigger: c.SystemAutoTrigger,
+		Trigger: c.SystemAutoTaskGroup,
 	}
-	event.Publish(ctx, &eventData)
+	event.Publish(&eventData)
 	cs, err := c.dockerProvider.FindAllContainersWithSessionId(ctx, c.GetSessionId())
 	if err != nil {
 		return
@@ -259,7 +280,7 @@ func (c *Compose) StopPods(ctx context.Context) {
 	}
 	eventData = event.ComposeEventData{
 		Type:    event.ComposeEventAfterStopType,
-		Trigger: c.SystemAutoTrigger,
+		Trigger: c.SystemAutoTaskGroup,
 	}
-	event.Publish(ctx, &eventData)
+	event.Publish(&eventData)
 }

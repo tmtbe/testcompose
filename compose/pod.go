@@ -48,13 +48,10 @@ func NewPodCompose(sessionID string, hostContextPath string, pods []*PodConfig, 
 	}
 }
 
-func (p *PodCompose) StartTrigger(podName string, containers []*ContainerConfig, ctx context.Context) error {
-	event.Publish(ctx, &event.PodEventData{
-		TracingData: event.TracingData{
-			PodName: podName,
-		},
-		Type: event.PodEventStartType,
-		Name: podName,
+func (p *PodCompose) StartTaskGroup(podName string, taskGroup *TaskGroup, ctx context.Context) error {
+	event.Publish(&event.TaskGroupEventData{
+		TaskGroupName: taskGroup.Name,
+		Type:          event.TaskGroupEventTaskGroupStart,
 	})
 	// clean trigger pod containers
 	cs, err := p.dockerProvider.FindAllContainersWithSessionId(ctx, p.sessionId)
@@ -87,12 +84,26 @@ func (p *PodCompose) StartTrigger(podName string, containers []*ContainerConfig,
 	defer func() {
 		_ = pauseContainer.Terminate(context.Background())
 	}()
-	for _, c := range containers {
+	for _, c := range taskGroup.Tasks {
+		event.Publish(&event.TaskEventData{
+			TaskGroupName: taskGroup.Name,
+			TaskName:      c.Name,
+			Type:          event.TaskEventTaskStart,
+		})
 		_, err := p.runContainer(podName, true, ctx, c, pauseContainer.GetContainerID())
 		if err != nil {
 			return err
 		}
+		event.Publish(&event.TaskEventData{
+			TaskGroupName: taskGroup.Name,
+			TaskName:      c.Name,
+			Type:          event.TaskEventTaskSuccess,
+		})
 	}
+	event.Publish(&event.TaskGroupEventData{
+		TaskGroupName: taskGroup.Name,
+		Type:          event.TaskGroupEventTaskGroupSuccess,
+	})
 	return nil
 }
 
@@ -134,12 +145,10 @@ func (p *PodCompose) concurrencyCreatePods(ctx context.Context, pods map[string]
 }
 
 func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
-	event.Publish(ctx, &event.PodEventData{
-		TracingData: event.TracingData{
-			PodName: pod.Name,
-		},
-		Type: event.PodEventStartType,
-		Name: pod.Name,
+	event.Publish(&event.PodEventData{
+		PodName: pod.Name,
+		Type:    event.PodEventStartType,
+		Name:    pod.Name,
 	})
 	containers := make([]docker.Container, 0)
 	// create pause container
@@ -181,12 +190,10 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		collectLogs(c)
 		p.observe.observeContainerId(c.GetContainerID())
 	}
-	event.Publish(ctx, &event.PodEventData{
-		TracingData: event.TracingData{
-			PodName: pod.Name,
-		},
-		Type: event.PodEventReadyType,
-		Name: pod.Name,
+	event.Publish(&event.PodEventData{
+		PodName: pod.Name,
+		Type:    event.PodEventReadyType,
+		Name:    pod.Name,
 	})
 	return nil
 }

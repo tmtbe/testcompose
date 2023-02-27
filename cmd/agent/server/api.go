@@ -85,7 +85,7 @@ func (a *Api) GetRoute() *gin.Engine {
 				"message": err.Error(),
 			})
 		}
-		err = a.compose.StartUserTrigger(ctx, taskGroupBody.Name)
+		err = a.compose.StartUserTaskGroup(ctx, taskGroupBody.Name)
 		if err == nil {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "run task success",

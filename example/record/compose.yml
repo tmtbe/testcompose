@@ -4,7 +4,7 @@ volumes:
   - name: test
 taskGroups:
   - name: testrunner
-    event: system_event_start_success
+    event: compose_event_start_success
     tasks:
     - name: do-curl1
       image: alpine/curl
@@ -17,7 +17,7 @@ taskGroups:
         - curl
         - "demo/inbound"
   - name: collect
-    event: system_event_trigger:testrunner
+    event: compose_event_task_group_success:testrunner
     tasks:
     - name: do-import-jaeger
       image: alpine/curl
@@ -27,7 +27,7 @@ taskGroups:
         - POST
         - "collector/import"
   - name: gen-mock
-    event: system_event_trigger:collect
+    event: compose_event_task_group_success:collect
     tasks:
     - name: do-create-mock
       image: testmesh/mockserver
@@ -41,7 +41,7 @@ taskGroups:
         - -o
         - /home
   - name: copy
-    event: system_event_trigger:gen-mock
+    event: compose_event_task_group_success:gen-mock
     tasks:
     - name: do-copy
       image: ubuntu
