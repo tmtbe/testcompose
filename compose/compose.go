@@ -41,6 +41,7 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string, hostCo
 	if config.SessionId == "" {
 		config.SessionId = genSessionId()
 	}
+	config.Network = "PodTestComposeNetwork_" + config.SessionId
 	err = config.check(contextPath)
 	if err != nil {
 		return nil, err
@@ -49,7 +50,7 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string, hostCo
 	if err != nil {
 		return nil, err
 	}
-	compose, err := NewPodCompose(sessionId, hostContextPath, config.Pods, config.GetNetworkName(), provider)
+	compose, err := NewPodCompose(sessionId, hostContextPath, config.Pods, config.Network, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -178,21 +179,17 @@ func (c *Compose) GetDockerProvider() *docker.DockerProvider {
 
 // PrepareNetwork network and volumes should be init before agent start
 func (c *Compose) PrepareNetwork(ctx context.Context) error {
-	if c.config.Network == "" {
+	_, err := c.dockerProvider.GetNetwork(ctx, docker.NetworkRequest{
+		Name: c.config.Network,
+	})
+	if err != nil {
 		_, err := c.dockerProvider.CreateNetwork(ctx, docker.NetworkRequest{
 			Driver:         docker.Bridge,
 			CheckDuplicate: true,
-			Name:           c.config.GetNetworkName(),
+			Name:           c.config.Network,
 		}, c.config.SessionId)
 		if err != nil {
 			return err
-		}
-	} else {
-		_, err := c.dockerProvider.GetNetwork(ctx, docker.NetworkRequest{
-			Name: c.config.Network,
-		})
-		if err != nil {
-			return errors.Errorf("network: %s is not exist", c.config.Network)
 		}
 	}
 	return nil
@@ -219,7 +216,7 @@ func (c *Compose) SystemAutoTaskGroup(ctx context.Context, eventName string) err
 				isFinish := true
 				for _, flag := range c.taskGroupEventRunRecord {
 					if flag == false {
-						isFinish = true
+						isFinish = false
 						break
 					}
 				}

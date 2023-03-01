@@ -93,29 +93,37 @@ func (a *Agent) GetInfo() Info {
 		IsReady:     a.composeProvider.IsReady(),
 	}
 }
-func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool) (docker.Container, error) {
+func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool, bootInDocker bool) (docker.Container, error) {
 	agentMounts := make([]docker.ContainerMount, 0)
 	agentMounts = append(agentMounts, docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock"))
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
 	agentMounts = append(agentMounts, docker.VolumeMount(common.SystemLogVolumeName+"_"+a.GetSessionId(), common.AgentLogPath))
 	containerName := common.ContainerNamePrefix + "agent_" + a.composeProvider.GetSessionId()
+	var waitStrategy wait.Strategy
+	if bootInDocker {
+		waitStrategy = wait.ForNetworkHTTP(common.EndPointAgentHealth, "agent").
+			WithPort(common.ServerAgentPort + "/tcp").
+			WithMethod("GET")
+	} else {
+		waitStrategy = wait.ForHTTP(common.EndPointAgentHealth).
+			WithPort(common.ServerAgentPort + "/tcp").
+			WithMethod("GET")
+	}
 	return a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
 		Image:        common.ImageAgent,
 		Name:         containerName,
 		ExposedPorts: []string{common.ServerAgentPort, common.ServerAgentEventBusPort},
 		Mounts:       agentMounts,
-		WaitingFor: wait.ForHTTP(common.EndPointAgentHealth).
-			WithPort(common.ServerAgentPort + "/tcp").
-			WithMethod("GET"),
+		WaitingFor:   waitStrategy,
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
 			common.EnvHostContextPath: a.composeProvider.GetContextPathForMount(),
 			common.TpcDebug:           os.Getenv(common.TpcDebug),
 			common.TpcName:            containerName,
 		},
-		Networks: []string{a.composeProvider.GetDockerProvider().GetDefaultNetwork(), a.composeProvider.GetConfig().GetNetworkName()},
+		Networks: []string{a.composeProvider.GetDockerProvider().GetDefaultNetwork(), a.composeProvider.GetConfig().Network},
 		NetworkAliases: map[string][]string{
-			a.composeProvider.GetConfig().GetNetworkName(): {"agent"},
+			a.composeProvider.GetConfig().Network: {"agent"},
 		},
 		Cmd: []string{"start", "--autoStart=" + strconv.FormatBool(autoStart)},
 		Labels: map[string]string{
@@ -297,7 +305,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeIngress,
 		},
-		Networks: []string{a.composeProvider.GetConfig().GetNetworkName()},
+		Networks: []string{a.composeProvider.GetConfig().Network},
 	}, a.GetSessionId())
 	if err != nil {
 		return nil, err

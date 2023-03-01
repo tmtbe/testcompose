@@ -1,5 +1,6 @@
 buildImage:
-	docker build -t podcompose/agent .
+	docker build --target agent -t podcompose/agent .
+	docker build --target compose -t podcompose/compose .
 build:
 	CGO_ENABLED=0 go build -o dist/compose ./cmd/compose
 install:

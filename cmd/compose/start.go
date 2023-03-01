@@ -28,14 +28,14 @@ type ConfigDump struct {
 	EventBusPort string
 }
 
-func (s *StartCmd) Start(autoStart bool, configDumpFile string) error {
+func (s *StartCmd) Start(autoStart bool, configDumpFile string, bootInDocker bool) error {
 	testCompose, err := testcompose.NewTestComposeWithSessionId(s.contextPath, s.name)
 	if err != nil {
 		return err
 	}
 	s.testCompose = testCompose
 	ctx := context.Background()
-	if err := testCompose.Start(ctx, autoStart); err != nil {
+	if err := testCompose.Start(ctx, autoStart, bootInDocker); err != nil {
 		return err
 	}
 	agentPort, err := testCompose.GetPort(ctx, common.ServerAgentPort)

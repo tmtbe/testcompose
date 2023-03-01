@@ -18,7 +18,7 @@ func TestTestCompose(t *testing.T) {
 		panic(err)
 	}
 	ctx := context.Background()
-	err = compose.Start(ctx, true)
+	err = compose.Start(ctx, true, false)
 	if err != nil {
 		panic(err)
 	}

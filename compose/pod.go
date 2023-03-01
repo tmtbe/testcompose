@@ -198,7 +198,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 	return nil
 }
 
-func (p *PodCompose) createWaitingFor(isInit bool, c *ContainerConfig) wait.Strategy {
+func (p *PodCompose) createWaitingFor(isInit bool, c *ContainerConfig, podName string) wait.Strategy {
 	var waitingFor wait.Strategy
 	if isInit {
 		exitCode := 0
@@ -212,14 +212,14 @@ func (p *PodCompose) createWaitingFor(isInit bool, c *ContainerConfig) wait.Stra
 		}
 		strategies := make([]wait.Strategy, 0)
 		if c.WaitingFor.HttpGet != nil {
-			strategies = append(strategies, wait.ForHTTP(c.WaitingFor.HttpGet.Path).
+			strategies = append(strategies, wait.ForNetworkHTTP(c.WaitingFor.HttpGet.Path, podName).
 				WithPort(nat.Port(fmt.Sprintf("%d%s", c.WaitingFor.HttpGet.Port, "/tcp"))).
 				WithMethod(c.WaitingFor.HttpGet.Method).
 				WithPollInterval(time.Duration(c.WaitingFor.PeriodSeconds)*time.Millisecond).
 				WithStartupTimeout(time.Duration(c.WaitingFor.InitialDelaySeconds)*time.Millisecond))
 		}
 		if c.WaitingFor.TcpSocket != nil {
-			strategies = append(strategies, wait.ForListeningPort(nat.Port(fmt.Sprintf("%d%s", c.WaitingFor.HttpGet.Port, "/tcp"))).
+			strategies = append(strategies, wait.ForNetworkPort(nat.Port(fmt.Sprintf("%d%s", c.WaitingFor.HttpGet.Port, "/tcp")), podName).
 				WithPollInterval(time.Duration(c.WaitingFor.PeriodSeconds)*time.Millisecond).
 				WithStartupTimeout(time.Duration(c.WaitingFor.InitialDelaySeconds)*time.Millisecond))
 		}
@@ -264,7 +264,7 @@ func (p *PodCompose) runContainer(podName string, isInit bool, ctx context.Conte
 		User:            c.User,
 		Env:             c.Env,
 		WorkingDir:      c.WorkingDir,
-		WaitingFor:      p.createWaitingFor(isInit, c),
+		WaitingFor:      p.createWaitingFor(isInit, c, podName),
 		Labels: map[string]string{
 			common.LabelPodName:       podName,
 			common.LabelContainerName: c.Name,

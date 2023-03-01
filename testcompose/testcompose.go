@@ -50,7 +50,7 @@ func (t *TestCompose) verify(ctx context.Context) error {
 	return nil
 }
 
-func (t *TestCompose) Start(ctx context.Context, autoStart bool) error {
+func (t *TestCompose) Start(ctx context.Context, autoStart bool, bootInDocker bool) error {
 	if err := t.verify(ctx); err != nil {
 		return err
 	}
@@ -66,7 +66,10 @@ func (t *TestCompose) Start(ctx context.Context, autoStart bool) error {
 	if !autoStart {
 		zap.L().Info("Auto Start is not enable, you need call agent start api to start compose")
 	}
-	agentContainer, err := t.agent.StartAgentForServer(ctx, autoStart)
+	if bootInDocker {
+		zap.L().Info("Boot agent service in docker container")
+	}
+	agentContainer, err := t.agent.StartAgentForServer(ctx, autoStart, bootInDocker)
 	if err != nil {
 		return err
 	}
