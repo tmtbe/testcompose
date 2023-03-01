@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"podcompose/common"
+	"podcompose/config"
 	"podcompose/docker"
 	"podcompose/docker/wait"
 	"strconv"
@@ -110,7 +111,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool, bootInD
 			WithMethod("GET")
 	}
 	return a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
-		Image:        common.ImageAgent,
+		Image:        config.ComposeConfig.Image.Agent,
 		Name:         containerName,
 		ExposedPorts: []string{common.ServerAgentPort, common.ServerAgentEventBusPort},
 		Mounts:       agentMounts,
@@ -125,7 +126,7 @@ func (a *Agent) StartAgentForServer(ctx context.Context, autoStart bool, bootInD
 		NetworkAliases: map[string][]string{
 			a.composeProvider.GetConfig().Network: {"agent"},
 		},
-		Cmd: []string{"start", "--autoStart=" + strconv.FormatBool(autoStart)},
+		Cmd: []string{"start", "--autoStart=" + strconv.FormatBool(autoStart), "--fromConfigJson", config.GetConfigJson()},
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeServer,
 		},
@@ -139,14 +140,14 @@ func (a *Agent) StartAgentForSetVolume(ctx context.Context) error {
 	agentMounts = append(agentMounts, docker.BindMount(a.composeProvider.GetContextPathForMount(), common.AgentContextPath))
 	agentMounts = append(agentMounts, docker.VolumeMount(common.SystemLogVolumeName+"_"+a.GetSessionId(), common.AgentLogPath))
 	cmd := make([]string, 0)
-	cmd = append(cmd, "prepareVolume")
+	cmd = append(cmd, "prepareVolume", "--fromConfigJson", config.GetConfigJson())
 	for _, volume := range a.composeProvider.GetConfig().Volumes {
 		volumeId := volume.Name + "_" + a.composeProvider.GetSessionId()
 		agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
 	}
 	containerName := common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.ImageAgent,
+		Image: config.ComposeConfig.Image.Agent,
 		Name:  common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId(),
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
@@ -170,13 +171,15 @@ func (a *Agent) StartAgentForSetVolumeGroup(ctx context.Context, selectGroupInde
 	cmd = append(cmd, "prepareVolumeGroup")
 	cmd = append(cmd, "-s")
 	cmd = append(cmd, strconv.Itoa(selectGroupIndex))
+	cmd = append(cmd, "--fromConfigJson")
+	cmd = append(cmd, config.GetConfigJson())
 	for _, volume := range a.composeProvider.GetConfig().VolumeGroups[selectGroupIndex].Volumes {
 		volumeId := volume.Name + "_" + a.composeProvider.GetSessionId()
 		agentMounts = append(agentMounts, docker.VolumeMount(volumeId, docker.ContainerMountTarget(common.AgentVolumePath+volume.Name)))
 	}
 	containerName := common.ContainerNamePrefix + "agent_volume_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.ImageAgent,
+		Image: config.ComposeConfig.Image.Agent,
 		Name:  containerName,
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
@@ -195,7 +198,7 @@ func (a *Agent) StartAgentForSetVolumeGroup(ctx context.Context, selectGroupInde
 func (a *Agent) StartAgentForClean(ctx context.Context) error {
 	containerName := common.ContainerNamePrefix + "agent_clean_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image:  common.ImageAgent,
+		Image:  config.ComposeConfig.Image.Agent,
 		Mounts: docker.Mounts(docker.BindMount("/var/run/docker.sock", "/var/run/docker.sock")),
 		Name:   containerName,
 		Env: map[string]string{
@@ -203,7 +206,7 @@ func (a *Agent) StartAgentForClean(ctx context.Context) error {
 			common.TpcDebug:       os.Getenv(common.TpcDebug),
 			common.TpcName:        containerName,
 		},
-		Cmd: []string{"clean"},
+		Cmd: []string{"clean", "--fromConfigJson", config.GetConfigJson()},
 		Labels: map[string]string{
 			docker.AgentType: docker.AgentTypeCleaner,
 		},
@@ -220,9 +223,11 @@ func (a *Agent) StartAgentForSwitchData(ctx context.Context, selectGroupIndex in
 	cmd = append(cmd, "switch")
 	cmd = append(cmd, "-s")
 	cmd = append(cmd, strconv.Itoa(selectGroupIndex))
+	cmd = append(cmd, "--fromConfigJson")
+	cmd = append(cmd, config.GetConfigJson())
 	containerName := common.ContainerNamePrefix + "agent_switch_" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.ImageAgent,
+		Image: config.ComposeConfig.Image.Agent,
 		Name:  containerName,
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
@@ -247,10 +252,12 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeId stri
 	for serviceName, portMapping := range servicePortInfo {
 		cmd = append(cmd, "-p")
 		cmd = append(cmd, serviceName+"="+portMapping)
+		cmd = append(cmd, "--fromConfigJson")
+		cmd = append(cmd, config.GetConfigJson())
 	}
 	containerName := common.ContainerNamePrefix + "agent_ingress_volume" + a.composeProvider.GetSessionId()
 	return a.runAndGetAgentError(ctx, docker.ContainerRequest{
-		Image: common.ImageAgent,
+		Image: config.ComposeConfig.Image.Agent,
 		Name:  common.ContainerNamePrefix + "agent_ingress_volume" + a.composeProvider.GetSessionId(),
 		Env: map[string]string{
 			common.LabelSessionID:     a.composeProvider.GetSessionId(),
@@ -294,7 +301,7 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 		exposePorts = append(exposePorts, ports[1]+":"+ports[1])
 	}
 	container, err := a.composeProvider.GetDockerProvider().RunContainer(ctx, docker.ContainerRequest{
-		Image:  common.ImageIngress,
+		Image:  config.ComposeConfig.Image.Ingress,
 		Name:   containerName,
 		Mounts: docker.Mounts(docker.VolumeMount(volumeId, "/etc/envoy")),
 		Env: map[string]string{

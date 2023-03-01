@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"os"
+	"podcompose/config"
 	_ "podcompose/event"
 )
 
@@ -16,29 +17,26 @@ func main() {
 		Use: "start",
 		Run: func(cmd *cobra.Command, args []string) {
 			debug, err := cmd.Flags().GetBool("debug")
-			if err != nil {
-				handleError(err)
-			}
+			handleError(err)
 			if debug {
 				_ = os.Setenv("TPC_DEBUG", "true")
 				InitLogger()
 			}
 			autoStart, err := cmd.Flags().GetBool("autoStart")
-			if err != nil {
-				handleError(err)
-			}
+			handleError(err)
 			bootInDocker, err := cmd.Flags().GetBool("bootInDocker")
-			if err != nil {
-				handleError(err)
-			}
+			handleError(err)
 			configDumpFile, err := cmd.Flags().GetString("configDumpFile")
-			if err != nil {
-				handleError(err)
-			}
+			handleError(err)
+			composeConfig, err := rootCmd.PersistentFlags().GetString("fromConfigJson")
+			handleError(err)
 			contextPath, err := cmd.Flags().GetString("path")
 			handleError(err)
 			name, err := cmd.Flags().GetString("name")
 			handleError(err)
+			if composeConfig != "" {
+				handleError(config.SetConfigJson(composeConfig))
+			}
 			start := NewStartCmd(contextPath, name)
 			handleError(start.Start(autoStart, configDumpFile, bootInDocker))
 		},
@@ -81,6 +79,7 @@ func main() {
 	rootCmd.AddCommand(shutdownCmd)
 	rootCmd.AddCommand(psCmd)
 	rootCmd.AddCommand(cleanCmd)
+	rootCmd.PersistentFlags().String("fromConfigJson", "", "compose config json")
 	err := rootCmd.Execute()
 	handleError(err)
 }

@@ -2,9 +2,6 @@ package common
 
 const TpcDebug = "TPC_DEBUG"
 const TpcName = "TPC_NAME"
-const ImageAgent = "podcompose/agent"
-const ImageIngress = "envoyproxy/envoy:v1.23-latest"
-const ImagePause = "gcr.io/google_containers/pause:3.0"
 
 const AgentContextPath = "/home/context/"
 const AgentLogPath = "/home/logs/"

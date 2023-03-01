@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"path/filepath"
 	"podcompose/common"
+	"podcompose/config"
 	"podcompose/docker"
 	"podcompose/docker/wait"
 	"podcompose/event"
@@ -69,7 +70,7 @@ func (p *PodCompose) StartTaskGroup(podName string, taskGroup *TaskGroup, ctx co
 		NetworkAliases: map[string][]string{
 			p.network: {podName},
 		},
-		Image:    common.ImagePause,
+		Image:    config.ComposeConfig.Image.Pause,
 		Networks: []string{p.dockerProvider.GetDefaultNetwork(), p.network},
 		CapAdd:   []string{"NET_ADMIN", "NET_RAW"},
 		Labels: map[string]string{
@@ -158,7 +159,7 @@ func (p *PodCompose) createPod(ctx context.Context, pod *PodConfig) error {
 		NetworkAliases: map[string][]string{
 			p.network: {pod.Name},
 		},
-		Image:    common.ImagePause,
+		Image:    config.ComposeConfig.Image.Pause,
 		Networks: []string{p.dockerProvider.GetDefaultNetwork(), p.network},
 		DNS:      pod.Dns,
 		Labels: map[string]string{

@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"podcompose/common"
+	"podcompose/config"
 	"podcompose/event"
 	"strings"
 )
@@ -24,13 +25,14 @@ func main() {
 	cleanCmd := &cobra.Command{
 		Use: "clean",
 		Run: func(cmd *cobra.Command, args []string) {
+			handleError(setConfig(rootCmd))
 			cleaner.clear()
 		},
 	}
 	prepareVolumeCmd := &cobra.Command{
 		Use: "prepareVolume",
 		Run: func(cmd *cobra.Command, args []string) {
-			handleError(err)
+			handleError(setConfig(rootCmd))
 			err = volume.copyDataToVolume(volume.GetConfig().Volumes)
 			handleError(err)
 		},
@@ -38,6 +40,7 @@ func main() {
 	prepareVolumeGroupCmd := &cobra.Command{
 		Use: "prepareVolumeGroup",
 		Run: func(cmd *cobra.Command, args []string) {
+			handleError(setConfig(rootCmd))
 			selectGroupIndex, err := cmd.Flags().GetInt("selectGroupIndex")
 			handleError(err)
 			err = volume.copyDataToVolumeGroup(selectGroupIndex)
@@ -48,6 +51,7 @@ func main() {
 	startCmd := &cobra.Command{
 		Use: "start",
 		Run: func(cmd *cobra.Command, args []string) {
+			handleError(setConfig(rootCmd))
 			err = event.StartEventBusServer()
 			if err != nil {
 				handleError(err)
@@ -73,6 +77,7 @@ func main() {
 	prepareIngressVolumeCmd := &cobra.Command{
 		Use: "prepareIngressVolume",
 		Run: func(cmd *cobra.Command, args []string) {
+			handleError(setConfig(rootCmd))
 			servicePorts, err := cmd.Flags().GetStringArray("ports")
 			handleError(err)
 			servicePortMap := make(map[string]string)
@@ -90,6 +95,7 @@ func main() {
 	rootCmd.AddCommand(prepareVolumeCmd)
 	rootCmd.AddCommand(prepareVolumeGroupCmd)
 	rootCmd.AddCommand(prepareIngressVolumeCmd)
+	rootCmd.PersistentFlags().String("fromConfigJson", "", "compose config json")
 	err = rootCmd.Execute()
 	handleError(err)
 }
@@ -99,4 +105,12 @@ func handleError(err error) {
 		zap.L().Sugar().Error(err)
 		os.Exit(1)
 	}
+}
+
+func setConfig(rootCmd *cobra.Command) error {
+	configJson, err := rootCmd.PersistentFlags().GetString("fromConfigJson")
+	if err != nil {
+		return err
+	}
+	return config.SetConfigJson(configJson)
 }
