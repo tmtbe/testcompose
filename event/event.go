@@ -55,13 +55,14 @@ const Compose string = "compose"
 const ComposeEventBeforeStartType = "compose_event_before_start"
 const ComposeEventStartSuccessType = "compose_event_start_success"
 const ComposeEventStartFailType = "compose_event_start_fail"
+const ComposeEventStartFinishType = "compose_event_start_finish"
 const ComposeEventBeforeRestartType = "compose_event_before_restart"
 const ComposeEventRestartSuccessType = "compose_event_restart_success"
 const ComposeEventRestartFailType = "compose_event_restart_fail"
+const ComposeEventRestartFinishType = "compose_event_restart_finish"
 const ComposeEventBeforeStopType = "compose_event_before_stop"
 const ComposeEventAfterStopType = "compose_event_after_stop"
 const ComposeEventTaskGroupSuccess = "compose_event_task_group_success"
-const ComposeEventAutoTaskGroupAllFinish = "compose_event_auto_task_group_all_finish"
 
 const Error string = "error"
 
@@ -88,12 +89,6 @@ const ContainerEventRemoveType = "container_event_container_remove"
 const ContainerEventStateType = "container_event_container_state"
 
 func Publish(event Event) {
-	go func() {
-		err := event.Do()
-		if err != nil {
-			zap.L().Sugar().Errorf("event %s do error %s", event.ToMessage().ToJson(), err)
-		}
-	}()
 	event.SetEventTime(time.Now())
 	if Bus != nil {
 		err := Bus.Publish(event)
@@ -102,6 +97,10 @@ func Publish(event Event) {
 		}
 	}
 	zap.L().Sugar().Debugf("event[%s]: %s", event.Topic(), event.ToMessage().ToJson())
+	err := event.Do()
+	if err != nil {
+		zap.L().Sugar().Errorf("event %s do error %s", event.ToMessage().ToJson(), err)
+	}
 }
 
 type Event interface {

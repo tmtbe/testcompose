@@ -16,15 +16,14 @@ import (
 )
 
 type Compose struct {
-	podCompose              *PodCompose
-	config                  *ComposeConfig
-	dockerProvider          *docker.DockerProvider
-	volume                  *VolumeGroups
-	contextPath             string
-	hostContextPath         string
-	ready                   bool
-	triggerLock             sync.Mutex
-	taskGroupEventRunRecord map[string]bool
+	podCompose      *PodCompose
+	config          *ComposeConfig
+	dockerProvider  *docker.DockerProvider
+	volume          *VolumeGroups
+	contextPath     string
+	hostContextPath string
+	ready           bool
+	triggerLock     sync.Mutex
 }
 
 func NewCompose(configBytes []byte, sessionId string, contextPath string, hostContextPath string) (*Compose, error) {
@@ -61,13 +60,12 @@ func NewCompose(configBytes []byte, sessionId string, contextPath string, hostCo
 		}
 	}
 	return &Compose{
-		podCompose:              compose,
-		config:                  &config,
-		dockerProvider:          provider,
-		volume:                  NewVolumeGroups(config.VolumeGroups, provider),
-		contextPath:             contextPath,
-		hostContextPath:         hostContextPath,
-		taskGroupEventRunRecord: taskGroupEventRunRecord,
+		podCompose:      compose,
+		config:          &config,
+		dockerProvider:  provider,
+		volume:          NewVolumeGroups(config.VolumeGroups, provider),
+		contextPath:     contextPath,
+		hostContextPath: hostContextPath,
 	}, nil
 }
 
@@ -92,13 +90,17 @@ func (c *Compose) StartPods(ctx context.Context) error {
 		}
 	} else {
 		c.ready = true
+		zap.L().Info("Compose is ready, all pods is started")
 		eventData = event.ComposeEventData{
 			Type:    event.ComposeEventStartSuccessType,
 			Trigger: c.SystemAutoTaskGroup,
 		}
-		zap.L().Info("Compose is ready, all pods is started")
 	}
 	event.Publish(&eventData)
+	event.Publish(&event.ComposeEventData{
+		Type:    event.ComposeEventStartFinishType,
+		Trigger: c.SystemAutoTaskGroup,
+	})
 	return err
 }
 
@@ -150,6 +152,10 @@ func (c *Compose) RestartPods(ctx context.Context, podNames []string, beforeStar
 		}
 	}
 	event.Publish(&eventData)
+	event.Publish(&event.ComposeEventData{
+		Type:    event.ComposeEventRestartFinishType,
+		Trigger: c.SystemAutoTaskGroup,
+	})
 	return err
 }
 
@@ -197,6 +203,8 @@ func (c *Compose) PrepareNetwork(ctx context.Context) error {
 
 func (c *Compose) SystemAutoTaskGroup(ctx context.Context, eventName string) error {
 	taskGroups := c.config.TaskGroups.GetTaskGroupFromEvent(eventName)
+	wg := sync.WaitGroup{}
+	wg.Add(len(taskGroups))
 	for _, taskGroup := range taskGroups {
 		taskGroup := taskGroup
 		go func() {
@@ -212,22 +220,11 @@ func (c *Compose) SystemAutoTaskGroup(ctx context.Context, eventName string) err
 					Type:    event.ComposeEventTaskGroupSuccess + ":" + taskGroup.Name,
 					Trigger: c.SystemAutoTaskGroup,
 				})
-				c.taskGroupEventRunRecord[taskGroup.Name] = true
-				isFinish := true
-				for _, flag := range c.taskGroupEventRunRecord {
-					if flag == false {
-						isFinish = false
-						break
-					}
-				}
-				if isFinish {
-					event.Publish(&event.ComposeEventData{
-						Type: event.ComposeEventAutoTaskGroupAllFinish,
-					})
-				}
 			}
+			wg.Done()
 		}()
 	}
+	wg.Wait()
 	return nil
 }
 
