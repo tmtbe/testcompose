@@ -930,8 +930,10 @@ func (c *DockerContainer) Start(ctx context.Context, req ContainerRequest) error
 func (c *DockerContainer) Stop(ctx context.Context, timeout *time.Duration) error {
 	shortID := c.ID[:12]
 	c.logger.Printf("Stopping container id: %s image: %s", shortID, c.Image)
-
-	if err := c.provider.client.ContainerStop(ctx, c.ID, timeout); err != nil {
+	second := int(timeout.Seconds())
+	if err := c.provider.client.ContainerStop(ctx, c.ID, container.StopOptions{
+		Timeout: &second,
+	}); err != nil {
 		return err
 	}
 
