@@ -9,6 +9,7 @@ import (
 	"podcompose/config"
 	"podcompose/docker"
 	"podcompose/docker/wait"
+	"podcompose/event"
 	"strconv"
 	"strings"
 )
@@ -16,33 +17,6 @@ import (
 type Agent struct {
 	composeProvider    ComposeProvider
 	servicePortInfoMap map[string]string
-}
-type Info struct {
-	SessionId   string
-	IsReady     bool
-	VolumeInfos []VolumeInfo
-	PodInfos    []PodInfo
-	Ingresses   []IngressInfo
-}
-type IngressInfo struct {
-	ServiceName string
-	ServicePort string
-	HostPort    string
-}
-type PodInfo struct {
-	Name           string
-	ContainerInfos []ContainerInfo
-}
-type ContainerInfo struct {
-	Name        string
-	ContainerId string
-	State       string
-	Image       string
-	Created     int64
-}
-type VolumeInfo struct {
-	Name     string
-	VolumeId string
 }
 
 type ComposeProvider interface {
@@ -63,12 +37,26 @@ func NewAgent(composeProvider ComposeProvider) *Agent {
 func (a *Agent) GetSessionId() string {
 	return a.composeProvider.GetSessionId()
 }
-func (a *Agent) GetInfo() Info {
-	var volumeInfos []VolumeInfo
+
+func (a *Agent) getIngressInfos() []common.IngressInfo {
+	ingresses := make([]common.IngressInfo, 0)
+	for name, portPair := range a.servicePortInfoMap {
+		pair := strings.Split(portPair, ":")
+		ingress := common.IngressInfo{
+			ServiceName: name,
+			ServicePort: pair[0],
+			HostPort:    pair[1],
+		}
+		ingresses = append(ingresses, ingress)
+	}
+	return ingresses
+}
+func (a *Agent) GetInfo() common.Info {
+	var volumeInfos []common.VolumeInfo
 	if len(a.composeProvider.GetConfig().VolumeGroups) > 0 {
-		volumeInfos := make([]VolumeInfo, len(a.composeProvider.GetConfig().VolumeGroups[0].Volumes))
+		volumeInfos := make([]common.VolumeInfo, len(a.composeProvider.GetConfig().VolumeGroups[0].Volumes))
 		for i, v := range a.composeProvider.GetConfig().VolumeGroups[0].Volumes {
-			volumeInfos[i] = VolumeInfo{
+			volumeInfos[i] = common.VolumeInfo{
 				Name:     v.Name,
 				VolumeId: v.Name + "_" + genSessionId(),
 			}
@@ -76,12 +64,12 @@ func (a *Agent) GetInfo() Info {
 	}
 	ctx := context.Background()
 	containers, _ := a.composeProvider.GetDockerProvider().FindAllContainersWithSessionId(ctx, a.composeProvider.GetSessionId())
-	podInfos := make([]PodInfo, len(a.composeProvider.GetConfig().Pods))
+	podInfos := make([]common.PodInfo, len(a.composeProvider.GetConfig().Pods))
 	for i, p := range a.composeProvider.GetConfig().Pods {
-		containerInfos := make([]ContainerInfo, 0)
+		containerInfos := make([]common.ContainerInfo, 0)
 		for _, c := range containers {
 			if c.Labels[common.LabelPodName] == p.Name {
-				containerInfos = append(containerInfos, ContainerInfo{
+				containerInfos = append(containerInfos, common.ContainerInfo{
 					Name:        c.Labels[common.LabelContainerName],
 					ContainerId: c.ID,
 					State:       c.State,
@@ -90,26 +78,17 @@ func (a *Agent) GetInfo() Info {
 				})
 			}
 		}
-		podInfos[i] = PodInfo{
+		podInfos[i] = common.PodInfo{
 			Name:           p.Name,
 			ContainerInfos: containerInfos,
 		}
 	}
-	ingresses := make([]IngressInfo, 0)
-	for name, portPair := range a.servicePortInfoMap {
-		pair := strings.Split(portPair, ":")
-		ingress := IngressInfo{
-			ServiceName: name,
-			ServicePort: pair[0],
-			HostPort:    pair[1],
-		}
-		ingresses = append(ingresses, ingress)
-	}
-	return Info{
+
+	return common.Info{
 		SessionId:   genSessionId(),
 		VolumeInfos: volumeInfos,
 		PodInfos:    podInfos,
-		Ingresses:   ingresses,
+		Ingresses:   a.getIngressInfos(),
 		IsReady:     a.composeProvider.IsReady(),
 	}
 }
@@ -348,6 +327,10 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 	if err != nil {
 		return nil, err
 	}
+	event.Publish(&event.IngressEventData{
+		Type:         event.IngressEventChange,
+		IngressInfos: a.getIngressInfos(),
+	})
 	collectLogs(container)
 	return container, nil
 }

@@ -26,6 +26,7 @@ type EventMsg struct {
 	ContainerEventData *ContainerEventData
 	TaskGroupEventData *TaskGroupEventData
 	TaskEventData      *TaskEventData
+	IngressEventData   *IngressEventData
 	ErrorData          *ErrorData
 }
 
@@ -87,6 +88,9 @@ const ContainerEventStartType = "container_event_container_start"
 const ContainerEventReadyType = "container_event_container_ready"
 const ContainerEventRemoveType = "container_event_container_remove"
 const ContainerEventStateType = "container_event_container_state"
+
+const Ingress = "ingress"
+const IngressEventChange = "ingress_event_change"
 
 func Publish(event Event) {
 	event.SetEventTime(time.Now())
@@ -267,5 +271,30 @@ func (t *TaskEventData) Topic() string {
 }
 
 func (t *TaskEventData) Do() error {
+	return nil
+}
+
+type IngressEventData struct {
+	Type         string
+	IngressInfos []common.IngressInfo
+	EventTime    time.Time
+}
+
+func (t *IngressEventData) SetEventTime(eventTime time.Time) {
+	t.EventTime = eventTime
+}
+
+func (t *IngressEventData) ToMessage() *EventMsg {
+	return &EventMsg{
+		Topic:            t.Topic(),
+		IngressEventData: t,
+	}
+}
+
+func (t *IngressEventData) Topic() string {
+	return Ingress
+}
+
+func (t *IngressEventData) Do() error {
 	return nil
 }
