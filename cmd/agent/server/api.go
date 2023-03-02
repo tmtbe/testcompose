@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"podcompose/common"
 	"podcompose/compose"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -175,6 +177,29 @@ func (a *Api) GetRoute() *gin.Engine {
 				"message": err.Error(),
 			})
 			return
+		}
+		for _, ports := range ingressBody {
+			pair := strings.Split(ports, ":")
+			if len(pair) != 2 {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": "port format error",
+				})
+				return
+			}
+			_, err = strconv.ParseInt(pair[0], 10, 64)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": "port format error",
+				})
+				return
+			}
+			_, err = strconv.ParseInt(pair[1], 10, 64)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"message": "port format error",
+				})
+				return
+			}
 		}
 		_, err = a.agent.StartAgentForIngress(ctx, ingressBody)
 		if err != nil {

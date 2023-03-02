@@ -14,13 +14,20 @@ import (
 )
 
 type Agent struct {
-	composeProvider ComposeProvider
+	composeProvider    ComposeProvider
+	servicePortInfoMap map[string]string
 }
 type Info struct {
 	SessionId   string
 	IsReady     bool
 	VolumeInfos []VolumeInfo
 	PodInfos    []PodInfo
+	Ingresses   []IngressInfo
+}
+type IngressInfo struct {
+	ServiceName string
+	ServicePort string
+	HostPort    string
 }
 type PodInfo struct {
 	Name           string
@@ -48,7 +55,8 @@ type ComposeProvider interface {
 
 func NewAgent(composeProvider ComposeProvider) *Agent {
 	return &Agent{
-		composeProvider: composeProvider,
+		composeProvider:    composeProvider,
+		servicePortInfoMap: make(map[string]string),
 	}
 }
 
@@ -87,10 +95,21 @@ func (a *Agent) GetInfo() Info {
 			ContainerInfos: containerInfos,
 		}
 	}
+	ingresses := make([]IngressInfo, 0)
+	for name, portPair := range a.servicePortInfoMap {
+		pair := strings.Split(portPair, ":")
+		ingress := IngressInfo{
+			ServiceName: name,
+			ServicePort: pair[0],
+			HostPort:    pair[1],
+		}
+		ingresses = append(ingresses, ingress)
+	}
 	return Info{
 		SessionId:   genSessionId(),
 		VolumeInfos: volumeInfos,
 		PodInfos:    podInfos,
+		Ingresses:   ingresses,
 		IsReady:     a.composeProvider.IsReady(),
 	}
 }
@@ -274,6 +293,15 @@ func (a *Agent) startAgentForIngressSetVolume(ctx context.Context, volumeId stri
 }
 
 func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[string]string) (docker.Container, error) {
+	for serviceName, port := range servicePortInfo {
+		portPair := strings.Split(port, ":")
+		exposePort, _ := strconv.ParseInt(portPair[1], 10, 64)
+		if exposePort <= 0 {
+			delete(a.servicePortInfoMap, serviceName)
+		} else {
+			a.servicePortInfoMap[serviceName] = port
+		}
+	}
 	volumeName := common.IngressVolumeName
 	volumeId := volumeName + "_" + a.GetSessionId()
 	containerName := common.ContainerNamePrefix + "agent_ingress_" + a.composeProvider.GetSessionId()
@@ -284,19 +312,22 @@ func (a *Agent) StartAgentForIngress(ctx context.Context, servicePortInfo map[st
 	}
 	// then remove ingress volume
 	_ = a.composeProvider.GetDockerProvider().RemoveVolume(ctx, volumeName, a.GetSessionId(), true)
+	if len(a.servicePortInfoMap) == 0 {
+		return nil, nil
+	}
 	// create ingress volume
 	_, err := a.composeProvider.GetDockerProvider().CreateVolume(ctx, volumeName, a.GetSessionId(), "")
 	if err != nil {
 		return nil, err
 	}
 	// prepare volume
-	err = a.startAgentForIngressSetVolume(ctx, volumeId, servicePortInfo)
+	err = a.startAgentForIngressSetVolume(ctx, volumeId, a.servicePortInfoMap)
 	if err != nil {
 		return nil, err
 	}
 	// start ingress container
 	exposePorts := make([]string, 0)
-	for _, portInfo := range servicePortInfo {
+	for _, portInfo := range a.servicePortInfoMap {
 		ports := strings.SplitN(portInfo, ":", 2)
 		exposePorts = append(exposePorts, ports[1]+":"+ports[1])
 	}
