@@ -23,7 +23,7 @@ const LabelPodName = "POD_NAME"
 const LabelContainerName = "CONTAINER_NAME"
 
 const EnvHostContextPath = "HOST_CONTEXT_PATH"
-const ConfigFileName = "compose.yml"
+const ConfigFileName = "compose.yaml"
 
 const IngressVolumeName = "ingress"
 const SystemLogVolumeName = "tpc_system_log"
