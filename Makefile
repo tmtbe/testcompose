@@ -1,8 +1,5 @@
-buildImage:
-	docker build --target agent -t podcompose/agent .
-	docker build --target compose -t podcompose/compose .
 build:
-	CGO_ENABLED=0 go build -o dist/compose ./cmd/compose
+	docker build --target agent -t testmesh/compose-agent .
+	docker build --target compose -t testmesh/compose .
 install:
 	go install ./cmd/compose
-all: install buildImage

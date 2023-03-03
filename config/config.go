@@ -18,7 +18,7 @@ type Image struct {
 
 func init() {
 	ComposeConfig.Image = Image{
-		Agent:   "podcompose/agent",
+		Agent:   "testmesh/compose-agent",
 		Ingress: "envoyproxy/envoy:v1.23-latest",
 		Pause:   "gcr.io/google_containers/pause:3.0",
 	}
